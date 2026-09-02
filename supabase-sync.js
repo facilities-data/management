@@ -22,6 +22,8 @@
     let syncStarted = false;
     let applyingRemoteData = false;
     let downloadingData = false;
+    let realtimeChannel = null;
+    let pollingTimer = null;
 
     const uploadTimers = new Map();
 
@@ -40,24 +42,14 @@
             );
 
             if (existingScript) {
-                const checkLibrary = () => {
-                    if (window.supabase?.createClient) {
-                        resolve();
-                    } else {
-                        reject(new Error("Supabase library is unavailable."));
-                    }
-                };
-
-                existingScript.addEventListener("load", checkLibrary, {
+                existingScript.addEventListener("load", resolve, {
                     once: true
                 });
-
                 existingScript.addEventListener("error", () => {
                     reject(new Error("Supabase CDN failed to load."));
                 }, {
                     once: true
                 });
-
                 return;
             }
 
@@ -103,8 +95,7 @@
 
     function readLocal(key) {
         try {
-            const value = JSON.parse(localStorage.getItem(key) || "[]");
-            return value;
+            return JSON.parse(localStorage.getItem(key) || "[]");
         } catch {
             return [];
         }
@@ -236,6 +227,66 @@
         }
     }
 
+    function startRealtimeSync() {
+        if (!client || realtimeChannel) {
+            return;
+        }
+
+        realtimeChannel = client
+            .channel("fms-browser-storage-sync")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: TABLE_NAME
+                },
+                payload => {
+                    const changedKey =
+                        payload.new?.storage_key ||
+                        payload.old?.storage_key;
+
+                    if (!changedKey || SYNC_KEYS.includes(changedKey)) {
+                        downloadData();
+                    }
+                }
+            )
+            .subscribe(status => {
+                console.log("Supabase Realtime status:", status);
+
+                if (status === "SUBSCRIBED") {
+                    stopPolling();
+                } else if (
+                    status === "CHANNEL_ERROR" ||
+                    status === "TIMED_OUT" ||
+                    status === "CLOSED"
+                ) {
+                    startPolling();
+                }
+            });
+    }
+
+    function startPolling() {
+        if (pollingTimer) {
+            return;
+        }
+
+        pollingTimer = setInterval(() => {
+            if (syncReady && !document.hidden) {
+                downloadData();
+            }
+        }, 5000);
+    }
+
+    function stopPolling() {
+        if (!pollingTimer) {
+            return;
+        }
+
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+    }
+
     function installLocalStorageSync() {
         if (localStorage.__fmsSyncInstalled) {
             return;
@@ -292,9 +343,8 @@
 
         syncReady = true;
         await downloadData();
-
-        // Do not upload every key again here.
-        // downloadData() already uploads only missing local keys.
+        startRealtimeSync();
+        startPolling();
     }
 
     document.addEventListener("submit", event => {
@@ -311,8 +361,16 @@
             ) {
                 syncReady = true;
                 await downloadData();
+                startRealtimeSync();
+                startPolling();
             }
         }, 700);
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && syncReady) {
+            downloadData();
+        }
     });
 
     document.addEventListener("DOMContentLoaded", startSync);
