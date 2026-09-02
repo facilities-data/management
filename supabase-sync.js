@@ -40,27 +40,39 @@
             );
 
             if (existingScript) {
-                existingScript.addEventListener("load", resolve, {
-                    once: true
-                });
-                existingScript.addEventListener("error", reject, {
+                const checkLibrary = () => {
+                    if (window.supabase?.createClient) {
+                        resolve();
+                    } else {
+                        reject(new Error("Supabase library is unavailable."));
+                    }
+                };
+
+                existingScript.addEventListener("load", checkLibrary, {
                     once: true
                 });
 
-                setTimeout(() => {
-                    if (window.supabase?.createClient) {
-                        resolve();
-                    }
-                }, 1000);
+                existingScript.addEventListener("error", () => {
+                    reject(new Error("Supabase CDN failed to load."));
+                }, {
+                    once: true
+                });
 
                 return;
             }
 
             const script = document.createElement("script");
             script.src = SUPABASE_CDN;
-            script.onload = resolve;
+            script.onload = () => {
+                if (window.supabase?.createClient) {
+                    resolve();
+                } else {
+                    reject(new Error("Supabase library is unavailable."));
+                }
+            };
             script.onerror = () =>
                 reject(new Error("Supabase CDN failed to load."));
+
             document.head.appendChild(script);
         });
     }
@@ -73,10 +85,6 @@
         try {
             await loadSupabaseLibrary();
 
-            if (!window.supabase?.createClient) {
-                throw new Error("Supabase library is unavailable.");
-            }
-
             client = window.supabase.createClient(
                 SUPABASE_URL,
                 SUPABASE_ANON_KEY
@@ -88,13 +96,15 @@
                 "Supabase initialization failed:",
                 error.message
             );
+
             return false;
         }
     }
 
     function readLocal(key) {
         try {
-            return JSON.parse(localStorage.getItem(key) || "[]");
+            const value = JSON.parse(localStorage.getItem(key) || "[]");
+            return value;
         } catch {
             return [];
         }
@@ -152,9 +162,9 @@
 
     function scheduleUpload(key) {
         if (
+            !syncReady ||
             applyingRemoteData ||
-            downloadingData ||
-            !syncReady
+            downloadingData
         ) {
             return;
         }
@@ -162,8 +172,8 @@
         clearTimeout(uploadTimers.get(key));
 
         const timer = setTimeout(() => {
-            uploadKey(key);
             uploadTimers.delete(key);
+            uploadKey(key);
         }, 500);
 
         uploadTimers.set(key, timer);
@@ -175,14 +185,14 @@
     }
 
     async function uploadMissingLocalData(remoteKeys) {
-        for (const key of SYNC_KEYS) {
-            if (
-                !remoteKeys.has(key) &&
-                localStorage.getItem(key)
-            ) {
-                await uploadKey(key);
-            }
-        }
+        const missingKeys = SYNC_KEYS.filter(key =>
+            !remoteKeys.has(key) &&
+            localStorage.getItem(key)
+        );
+
+        await Promise.all(
+            missingKeys.map(key => uploadKey(key))
+        );
     }
 
     async function downloadData() {
@@ -216,9 +226,7 @@
 
             await uploadMissingLocalData(remoteKeys);
 
-            window.dispatchEvent(
-                new CustomEvent("fms-data-synced")
-            );
+            window.dispatchEvent(new CustomEvent("fms-data-synced"));
 
             if (typeof window.renderAll === "function") {
                 window.renderAll();
@@ -234,6 +242,7 @@
         }
 
         const originalSetItem = localStorage.setItem.bind(localStorage);
+        const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
         localStorage.setItem = (key, value) => {
             originalSetItem(key, value);
@@ -246,9 +255,6 @@
                 scheduleUpload(key);
             }
         };
-
-        const originalRemoveItem =
-            localStorage.removeItem.bind(localStorage);
 
         localStorage.removeItem = key => {
             originalRemoveItem(key);
@@ -280,16 +286,15 @@
         const connected = await createSupabaseClient();
 
         if (!connected) {
+            syncStarted = false;
             return;
         }
 
         syncReady = true;
         await downloadData();
 
-        // Upload changes made during application startup.
-        for (const key of SYNC_KEYS) {
-            await uploadKey(key);
-        }
+        // Do not upload every key again here.
+        // downloadData() already uploads only missing local keys.
     }
 
     document.addEventListener("submit", event => {
