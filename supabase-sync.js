@@ -27,6 +27,23 @@
 
     const uploadTimers = new Map();
 
+    function logStatus(message, error = null) {
+        if (error) {
+            console.error(`[FMS sync] ${message}`, error);
+        } else {
+            console.log(`[FMS sync] ${message}`);
+        }
+
+        window.dispatchEvent(
+            new CustomEvent("fms-sync-status", {
+                detail: {
+                    message,
+                    error: error?.message || ""
+                }
+            })
+        );
+    }
+
     function loadSupabaseLibrary() {
         if (window.supabase?.createClient) {
             return Promise.resolve();
@@ -36,7 +53,7 @@
             return window.supabaseLibraryReady;
         }
 
-        return new Promise((resolve, reject) => {
+        window.supabaseLibraryReady = new Promise((resolve, reject) => {
             const existingScript = document.querySelector(
                 `script[src="${SUPABASE_CDN}"]`
             );
@@ -45,16 +62,19 @@
                 existingScript.addEventListener("load", resolve, {
                     once: true
                 });
-                existingScript.addEventListener("error", () => {
-                    reject(new Error("Supabase CDN failed to load."));
-                }, {
-                    once: true
-                });
+
+                existingScript.addEventListener(
+                    "error",
+                    () => reject(new Error("Supabase CDN failed to load.")),
+                    { once: true }
+                );
+
                 return;
             }
 
             const script = document.createElement("script");
             script.src = SUPABASE_CDN;
+
             script.onload = () => {
                 if (window.supabase?.createClient) {
                     resolve();
@@ -62,11 +82,14 @@
                     reject(new Error("Supabase library is unavailable."));
                 }
             };
+
             script.onerror = () =>
                 reject(new Error("Supabase CDN failed to load."));
 
             document.head.appendChild(script);
         });
+
+        return window.supabaseLibraryReady;
     }
 
     async function createSupabaseClient() {
@@ -82,20 +105,18 @@
                 SUPABASE_ANON_KEY
             );
 
+            logStatus("Supabase client connected.");
             return true;
         } catch (error) {
-            console.error(
-                "Supabase initialization failed:",
-                error.message
-            );
-
+            logStatus("Supabase initialization failed.", error);
             return false;
         }
     }
 
     function readLocal(key) {
         try {
-            return JSON.parse(localStorage.getItem(key) || "[]");
+            const value = JSON.parse(localStorage.getItem(key) || "[]");
+            return value;
         } catch {
             return [];
         }
@@ -123,7 +144,7 @@
         return true;
     }
 
-    async function uploadKey(key) {
+    async function uploadKey(key, attempt = 1) {
         if (
             !client ||
             !syncReady ||
@@ -146,8 +167,15 @@
                 }
             );
 
-        if (error) {
-            console.error(`Could not sync ${key}:`, error.message);
+        if (!error) {
+            logStatus(`Uploaded ${key}.`);
+            return;
+        }
+
+        logStatus(`Could not upload ${key}.`, error);
+
+        if (attempt < 3) {
+            setTimeout(() => uploadKey(key, attempt + 1), attempt * 1500);
         }
     }
 
@@ -181,9 +209,9 @@
             localStorage.getItem(key)
         );
 
-        await Promise.all(
-            missingKeys.map(key => uploadKey(key))
-        );
+        for (const key of missingKeys) {
+            await uploadKey(key);
+        }
     }
 
     async function downloadData() {
@@ -197,20 +225,21 @@
         try {
             const { data, error } = await client
                 .from(TABLE_NAME)
-                .select("storage_key, data")
+                .select("storage_key, data, updated_at")
                 .in("storage_key", SYNC_KEYS);
 
             if (error) {
-                console.error(
-                    "Could not load shared data:",
-                    error.message
-                );
+                logStatus("Could not download shared data.", error);
                 return;
             }
 
             const remoteKeys = new Set();
 
             (data || []).forEach(row => {
+                if (!SYNC_KEYS.includes(row.storage_key)) {
+                    return;
+                }
+
                 remoteKeys.add(row.storage_key);
                 writeLocalIfChanged(row.storage_key, row.data);
             });
@@ -222,6 +251,8 @@
             if (typeof window.renderAll === "function") {
                 window.renderAll();
             }
+
+            logStatus("Shared data synchronized.");
         } finally {
             downloadingData = false;
         }
@@ -246,17 +277,20 @@
                         payload.new?.storage_key ||
                         payload.old?.storage_key;
 
-                    if (!changedKey || SYNC_KEYS.includes(changedKey)) {
+                    if (SYNC_KEYS.includes(changedKey)) {
+                        logStatus(`Realtime update received for ${changedKey}.`);
                         downloadData();
                     }
                 }
             )
             .subscribe(status => {
-                console.log("Supabase Realtime status:", status);
+                logStatus(`Realtime status: ${status}`);
 
                 if (status === "SUBSCRIBED") {
                     stopPolling();
-                } else if (
+                }
+
+                if (
                     status === "CHANNEL_ERROR" ||
                     status === "TIMED_OUT" ||
                     status === "CLOSED"
@@ -270,6 +304,8 @@
         if (pollingTimer) {
             return;
         }
+
+        logStatus("Polling fallback enabled.");
 
         pollingTimer = setInterval(() => {
             if (syncReady && !document.hidden) {
@@ -285,6 +321,7 @@
 
         clearInterval(pollingTimer);
         pollingTimer = null;
+        logStatus("Polling fallback disabled.");
     }
 
     function installLocalStorageSync() {
@@ -338,13 +375,18 @@
 
         if (!connected) {
             syncStarted = false;
+            startPolling();
             return;
         }
 
         syncReady = true;
+
         await downloadData();
         startRealtimeSync();
-        startPolling();
+
+        if (!realtimeChannel) {
+            startPolling();
+        }
     }
 
     document.addEventListener("submit", event => {
