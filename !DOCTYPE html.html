@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facilities Management Tracker</title>
+    <!-- Include Supabase JS Library -->
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f7f6; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        .logout-btn { background-color: #dc3545; margin-top: 20px; }
+        .logout-btn:hover { background-color: #bd2130; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- AUTHENTICATION SCREEN -->
+    <div id="auth-screen">
+        <h2>Facilities Tracker - Login</h2>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="enter your email">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="enter password">
+        </div>
+        <button id="btn-login">Log In</button>
+        <button id="btn-signup" style="background-color: #28a745; margin-top: 10px;">Sign Up As New User</button>
+    </div>
+
+    <!-- TRACKER DASHBOARD SCREEN -->
+    <div id="dashboard-screen" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Facilities Dashboard</h2>
+            <span id="user-display" style="font-size: 0.9em; color: #666;"></span>
+        </div>
+
+        <!-- Task Form -->
+        <form id="task-form">
+            <div class="form-group">
+                <label for="task_name">Issue / Task Name</label>
+                <input type="text" id="task_name" required placeholder="e.g., Broken AC Unit">
+            </div>
+            <div class="form-group">
+                <label for="location">Location</label>
+                <input type="text" id="location" required placeholder="e.g., Room 302">
+            </div>
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select id="status">
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+            <button type="submit">Add Facility Log</button>
+        </form>
+
+        <!-- Data Table -->
+        <table id="tracker-table">
+            <thead>
+                <tr>
+                    <th>Task / Issue</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Data loaded dynamically from cloud -->
+            </tbody>
+        </table>
+
+        <button id="btn-logout" class="logout-btn">Log Out</button>
+    </div>
+</div>
+
+<script>
+    // 1. CONFIGURATION: Replace these with your actual Supabase credentials
+    const SUPABASE_URL = "https://xoysdiavwxfuqygzonjt.supabase.co/rest/v1/";
+    const SUPABASE_ANON_KEY = "sb_publishable_2bARynoBkd0_tAjS2kXbYw_WQndR9j-";
+
+    // Initialize Supabase Client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // DOM Elements
+    const authScreen = document.getElementById('auth-screen');
+    const dashboardScreen = document.getElementById('dashboard-screen');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const userDisplay = document.getElementById('user-display');
+    const tableBody = document.getElementById('table-body');
+    const taskForm = document.getElementById('task-form');
+
+    // 2. CHECK SESSION ON LOAD
+    window.addEventListener('DOMContentLoaded', async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        handleSessionChange(session);
+    });
+
+    // Listen for authentication changes (login/logout events)
+    supabase.auth.onAuthStateChange((_event, session) => {
+        handleSessionChange(session);
+    });
+
+    function handleSessionChange(session) {
+        if (session) {
+            authScreen.classList.add('hidden');
+            dashboardScreen.classList.remove('hidden');
+            userDisplay.textContent = `Logged in as: ${session.user.email}`;
+            fetchTasks();
+        } else {
+            authScreen.classList.remove('hidden');
+            dashboardScreen.classList.add('hidden');
+            tableBody.innerHTML = '';
+        }
+    }
+
+    // 3. AUTHENTICATION ACTIONS
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+        const { error } = await supabase.auth.signUp({
+            email: emailInput.value,
+            password: passwordInput.value,
+        });
+        if (error) alert(error.message);
+        else alert('Signup successful! Check your email for confirmation if required, or try logging in.');
+    });
+
+    document.getElementById('btn-login').addEventListener('click', async () => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email: emailInput.value,
+            password: passwordInput.value,
+        });
+        if (error) alert(error.message);
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+        await supabase.auth.signOut();
+    });
+
+    // 4. DATABASE ACTIONS (CRUD)
+    async function fetchTasks() {
+        const { data, error } = await supabase.from('facilities_tracker').select('*').order('created_at', { ascending: false });
+        if (error) {
+            console.error(error);
+            return;
+        }
+        
+        tableBody.innerHTML = '';
+        data.forEach(task => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${escapeHTML(task.task_name)}</td>
+                <td>${escapeHTML(task.location)}</td>
+                <td><strong>${escapeHTML(task.status)}</strong></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    taskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const newTask = {
+            user_id: user.id,
+            task_name: document.getElementById('task_name').value,
+            location: document.getElementById('location').value,
+            status: document.getElementById('status').value
+        };
+
+        const { error } = await supabase.from('facilities_tracker').insert([newTask]);
+        if (error) {
+            alert(error.message);
+        } else {
+            taskForm.reset();
+            fetchTasks();
+        }
+    });
+
+    // Helper function to prevent Cross-Site Scripting (XSS)
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, 
+            tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+    }
+</script>
+</body>
+</html>
