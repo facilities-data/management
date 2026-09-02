@@ -138,7 +138,7 @@ function createProjectId() {
 
     const numbers = projects
         .map(project => {
-            const match = String(project.id).match(/^ARCPH(8\d{4})$/);
+            const match = String(project.id).match(/^ARC(\d{5})$/);
             return match ? Number(match[1]) : 79999;
         });
 
