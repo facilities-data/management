@@ -2,7 +2,6 @@
     const SUPABASE_URL = "https://xoysdiavwxfuqygzonjt.supabase.co";
     const SUPABASE_ANON_KEY =
         "sb_publishable_2bARynoBkd0_tAjS2kXbYw_WQndR9j-";
-
     const TABLE_NAME = "fms_browser_storage";
 
     const SYNC_KEYS = [
@@ -19,8 +18,11 @@
         "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
     let client = null;
-    let applyingRemoteData = false;
     let syncReady = false;
+    let syncStarted = false;
+    let applyingRemoteData = false;
+    let downloadingData = false;
+
     const uploadTimers = new Map();
 
     function loadSupabaseLibrary() {
@@ -44,6 +46,13 @@
                 existingScript.addEventListener("error", reject, {
                     once: true
                 });
+
+                setTimeout(() => {
+                    if (window.supabase?.createClient) {
+                        resolve();
+                    }
+                }, 1000);
+
                 return;
             }
 
@@ -57,6 +66,10 @@
     }
 
     async function createSupabaseClient() {
+        if (client) {
+            return true;
+        }
+
         try {
             await loadSupabaseLibrary();
 
@@ -71,7 +84,10 @@
 
             return true;
         } catch (error) {
-            console.error("Supabase initialization failed:", error.message);
+            console.error(
+                "Supabase initialization failed:",
+                error.message
+            );
             return false;
         }
     }
@@ -84,7 +100,17 @@
         }
     }
 
-    function writeLocal(key, value) {
+    function valuesAreEqual(first, second) {
+        return JSON.stringify(first) === JSON.stringify(second);
+    }
+
+    function writeLocalIfChanged(key, value) {
+        const currentValue = readLocal(key);
+
+        if (valuesAreEqual(currentValue, value)) {
+            return false;
+        }
+
         applyingRemoteData = true;
 
         try {
@@ -92,10 +118,17 @@
         } finally {
             applyingRemoteData = false;
         }
+
+        return true;
     }
 
     async function uploadKey(key) {
-        if (!client || !syncReady || applyingRemoteData) {
+        if (
+            !client ||
+            !syncReady ||
+            applyingRemoteData ||
+            downloadingData
+        ) {
             return;
         }
 
@@ -118,6 +151,14 @@
     }
 
     function scheduleUpload(key) {
+        if (
+            applyingRemoteData ||
+            downloadingData ||
+            !syncReady
+        ) {
+            return;
+        }
+
         clearTimeout(uploadTimers.get(key));
 
         const timer = setTimeout(() => {
@@ -128,73 +169,112 @@
         uploadTimers.set(key, timer);
     }
 
-    async function uploadAllLocalData() {
+    function cancelPendingUploads() {
+        uploadTimers.forEach(timer => clearTimeout(timer));
+        uploadTimers.clear();
+    }
+
+    async function uploadMissingLocalData(remoteKeys) {
         for (const key of SYNC_KEYS) {
-            if (localStorage.getItem(key)) {
+            if (
+                !remoteKeys.has(key) &&
+                localStorage.getItem(key)
+            ) {
                 await uploadKey(key);
             }
         }
     }
 
     async function downloadData() {
-        if (!client) {
+        if (!client || downloadingData) {
             return;
         }
 
-        const { data, error } = await client
-            .from(TABLE_NAME)
-            .select("storage_key, data")
-            .in("storage_key", SYNC_KEYS);
+        downloadingData = true;
+        cancelPendingUploads();
 
-        if (error) {
-            console.error("Could not load shared data:", error.message);
-            return;
-        }
+        try {
+            const { data, error } = await client
+                .from(TABLE_NAME)
+                .select("storage_key, data")
+                .in("storage_key", SYNC_KEYS);
 
-        const remoteKeys = new Set();
-
-        (data || []).forEach(row => {
-            remoteKeys.add(row.storage_key);
-            writeLocal(row.storage_key, row.data);
-        });
-
-        // Upload local records only for keys that do not exist remotely.
-        for (const key of SYNC_KEYS) {
-            if (!remoteKeys.has(key) && localStorage.getItem(key)) {
-                await uploadKey(key);
+            if (error) {
+                console.error(
+                    "Could not load shared data:",
+                    error.message
+                );
+                return;
             }
-        }
 
-        window.dispatchEvent(new CustomEvent("fms-data-synced"));
+            const remoteKeys = new Set();
 
-        if (typeof window.renderAll === "function") {
-            window.renderAll();
+            (data || []).forEach(row => {
+                remoteKeys.add(row.storage_key);
+                writeLocalIfChanged(row.storage_key, row.data);
+            });
+
+            await uploadMissingLocalData(remoteKeys);
+
+            window.dispatchEvent(
+                new CustomEvent("fms-data-synced")
+            );
+
+            if (typeof window.renderAll === "function") {
+                window.renderAll();
+            }
+        } finally {
+            downloadingData = false;
         }
     }
 
     function installLocalStorageSync() {
+        if (localStorage.__fmsSyncInstalled) {
+            return;
+        }
+
         const originalSetItem = localStorage.setItem.bind(localStorage);
 
         localStorage.setItem = (key, value) => {
             originalSetItem(key, value);
 
-            if (SYNC_KEYS.includes(key)) {
+            if (
+                SYNC_KEYS.includes(key) &&
+                !applyingRemoteData &&
+                !downloadingData
+            ) {
                 scheduleUpload(key);
             }
         };
 
-        const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+        const originalRemoveItem =
+            localStorage.removeItem.bind(localStorage);
 
         localStorage.removeItem = key => {
             originalRemoveItem(key);
 
-            if (SYNC_KEYS.includes(key)) {
+            if (
+                SYNC_KEYS.includes(key) &&
+                !applyingRemoteData &&
+                !downloadingData
+            ) {
                 scheduleUpload(key);
             }
         };
+
+        Object.defineProperty(localStorage, "__fmsSyncInstalled", {
+            value: true,
+            configurable: false,
+            enumerable: false
+        });
     }
 
     async function startSync() {
+        if (syncStarted) {
+            return;
+        }
+
+        syncStarted = true;
         installLocalStorageSync();
 
         const connected = await createSupabaseClient();
@@ -203,13 +283,13 @@
             return;
         }
 
-        // Enable syncing before loading data so local records can be uploaded.
         syncReady = true;
-
         await downloadData();
 
-        // Upload any local records created during application startup.
-        await uploadAllLocalData();
+        // Upload changes made during application startup.
+        for (const key of SYNC_KEYS) {
+            await uploadKey(key);
+        }
     }
 
     document.addEventListener("submit", event => {
@@ -218,17 +298,14 @@
         }
 
         setTimeout(async () => {
-            if (!client) {
-                await createSupabaseClient();
-            }
+            const connected = await createSupabaseClient();
 
             if (
-                client &&
+                connected &&
                 sessionStorage.getItem("fms_logged_in") === "true"
             ) {
                 syncReady = true;
                 await downloadData();
-                await uploadAllLocalData();
             }
         }, 700);
     });
