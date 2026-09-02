@@ -644,8 +644,13 @@
         });
     });
 </script>
-    <script src="supabase2.js"></script>
-<script src="supabase-sync.js"></script>
+    <script>
+    window.supabaseClient = window.supabase.createClient(
+        "https://xoysdiavwxfuqygzonjt.supabase.co",
+        "sb_publishable_2bARynoBkd0_tAjS2kXbYw_WQndR9j-"
+    );
+</script>
+
 <script src="special-request.js"></script>
 <script src="script.js"></script>
 </body>
