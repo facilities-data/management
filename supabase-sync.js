@@ -21,7 +21,7 @@
     let client = null;
     let applyingRemoteData = false;
     let syncReady = false;
-    let uploadTimer = null;
+    const uploadTimers = new Map();
 
     function loadSupabaseLibrary() {
         if (window.supabase?.createClient) {
@@ -61,17 +61,18 @@
             await loadSupabaseLibrary();
 
             if (!window.supabase?.createClient) {
-                throw new Error(
-                    "Supabase library was not loaded. Check the CDN connection."
-                );
+                throw new Error("Supabase library is unavailable.");
             }
 
             client = window.supabase.createClient(
                 SUPABASE_URL,
                 SUPABASE_ANON_KEY
             );
+
+            return true;
         } catch (error) {
             console.error("Supabase initialization failed:", error.message);
+            return false;
         }
     }
 
@@ -117,11 +118,22 @@
     }
 
     function scheduleUpload(key) {
-        clearTimeout(uploadTimer);
+        clearTimeout(uploadTimers.get(key));
 
-        uploadTimer = setTimeout(() => {
+        const timer = setTimeout(() => {
             uploadKey(key);
-        }, 400);
+            uploadTimers.delete(key);
+        }, 500);
+
+        uploadTimers.set(key, timer);
+    }
+
+    async function uploadAllLocalData() {
+        for (const key of SYNC_KEYS) {
+            if (localStorage.getItem(key)) {
+                await uploadKey(key);
+            }
+        }
     }
 
     async function downloadData() {
@@ -146,6 +158,7 @@
             writeLocal(row.storage_key, row.data);
         });
 
+        // Upload local records only for keys that do not exist remotely.
         for (const key of SYNC_KEYS) {
             if (!remoteKeys.has(key) && localStorage.getItem(key)) {
                 await uploadKey(key);
@@ -175,22 +188,28 @@
         localStorage.removeItem = key => {
             originalRemoveItem(key);
 
-            if (SYNC_KEYS.includes(key) && syncReady) {
+            if (SYNC_KEYS.includes(key)) {
                 scheduleUpload(key);
             }
         };
     }
 
-    async function initializeSync() {
+    async function startSync() {
         installLocalStorageSync();
-        await createSupabaseClient();
 
-        await new Promise(resolve => setTimeout(resolve, 300));
+        const connected = await createSupabaseClient();
 
-        if (sessionStorage.getItem("fms_logged_in") === "true") {
-            await downloadData();
-            syncReady = true;
+        if (!connected) {
+            return;
         }
+
+        // Enable syncing before loading data so local records can be uploaded.
+        syncReady = true;
+
+        await downloadData();
+
+        // Upload any local records created during application startup.
+        await uploadAllLocalData();
     }
 
     document.addEventListener("submit", event => {
@@ -203,12 +222,16 @@
                 await createSupabaseClient();
             }
 
-            if (client && sessionStorage.getItem("fms_logged_in") === "true") {
-                await downloadData();
+            if (
+                client &&
+                sessionStorage.getItem("fms_logged_in") === "true"
+            ) {
                 syncReady = true;
+                await downloadData();
+                await uploadAllLocalData();
             }
-        }, 500);
+        }, 700);
     });
 
-    document.addEventListener("DOMContentLoaded", initializeSync);
+    document.addEventListener("DOMContentLoaded", startSync);
 })();
