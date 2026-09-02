@@ -3081,3 +3081,291 @@ function createUserManagementButton() {
 
     window.applyRolePermissions = applyRolePermissions;
 })();
+
+(() => {
+    const originalSetupUserAuthentication = setupUserAuthentication;
+
+    setupUserAuthentication = function () {
+        const loginForm = getElement("login-form");
+
+        if (!loginForm) {
+            return;
+        }
+
+        // Remove the old registration button and modal from the login page.
+        getElement("register-user-button")?.remove();
+        getElement("register-user-modal")?.remove();
+
+        handleLogin = function (event) {
+            event.preventDefault();
+
+            const username = getElement("login-username").value.trim();
+            const password = getElement("login-password").value;
+
+            const user = getUsers().find(item =>
+                item.username.toLowerCase() === username.toLowerCase() &&
+                item.password === password
+            );
+
+            if (!user) {
+                getElement("login-error").textContent =
+                    "Invalid username or password.";
+                getElement("login-error").classList.add("visible");
+                getElement("login-password").select();
+                return;
+            }
+
+            sessionStorage.setItem("fms_logged_in", "true");
+            sessionStorage.setItem("fms_current_user", user.username);
+            sessionStorage.setItem("fms_current_role", user.role);
+
+            getElement("login-screen").classList.add("hidden");
+            getElement("login-screen").style.display = "";
+            document.querySelector(".sidebar").style.display = "";
+            document.querySelector(".main-content").style.display = "";
+            getElement("login-error").classList.remove("visible");
+
+            if (user.role === "Administrator") {
+                createUserManagementButton();
+            }
+
+            window.applyRolePermissions?.();
+        };
+    };
+
+    createUserManagementButton = function () {
+        if (
+            getElement("manage-users-button") ||
+            sessionStorage.getItem("fms_current_role") !== "Administrator"
+        ) {
+            return;
+        }
+
+        const button = document.createElement("button");
+        button.id = "manage-users-button";
+        button.type = "button";
+        button.className = "btn-action btn-primary";
+        button.textContent = "Manage Users";
+        button.style.marginLeft = "8px";
+
+        getElement("download-report").parentElement.appendChild(button);
+
+        const modal = document.createElement("div");
+        modal.id = "manage-users-modal";
+        modal.className = "modal";
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage Users</h2>
+                    <button type="button" class="modal-close">&times;</button>
+                </div>
+
+                <form id="manage-user-form">
+                    <input type="hidden" id="managed-original-username">
+
+                    <div class="form-group">
+                        <label for="managed-username">Username</label>
+                        <input id="managed-username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="managed-password">Password</label>
+                        <input id="managed-password" type="password" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="managed-role">Role</label>
+                        <select id="managed-role" required>
+                            <option>Administrator</option>
+                            <option>User</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-submit">
+                        Add User
+                    </button>
+                </form>
+
+                <hr style="margin:20px 0;border:0;border-top:1px solid #99f6e4">
+
+                <div id="user-list"></div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const form = getElement("manage-user-form");
+        const userList = getElement("user-list");
+        const originalUsername = getElement("managed-original-username");
+        const usernameInput = getElement("managed-username");
+        const passwordInput = getElement("managed-password");
+        const roleInput = getElement("managed-role");
+        const submitButton = form.querySelector("button[type='submit']");
+
+        const resetForm = () => {
+            form.reset();
+            originalUsername.value = "";
+            roleInput.value = "User";
+            submitButton.textContent = "Add User";
+            passwordInput.required = true;
+        };
+
+        const renderUsers = () => {
+            const currentUsername =
+                sessionStorage.getItem("fms_current_user");
+
+            userList.innerHTML = getUsers()
+                .map(user => `
+                    <div class="reminder-item">
+                        <strong>${escapeHtml(user.username)}</strong>
+                        <br>
+                        <small>${escapeHtml(user.role)}</small>
+
+                        <div style="margin-top:8px">
+                            <button
+                                type="button"
+                                class="btn-action btn-primary edit-managed-user"
+                                data-username="${escapeHtml(user.username)}"
+                            >
+                                Edit
+                            </button>
+
+                            ${
+                                user.username !== "admin" &&
+                                user.username !== currentUsername
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="btn-action btn-danger delete-managed-user"
+                                            data-username="${escapeHtml(user.username)}"
+                                        >
+                                            Delete
+                                        </button>
+                                    `
+                                    : ""
+                            }
+                        </div>
+                    </div>
+                `)
+                .join("");
+
+            userList.querySelectorAll(".edit-managed-user").forEach(editButton => {
+                editButton.onclick = () => {
+                    const user = getUsers().find(item =>
+                        item.username === editButton.dataset.username
+                    );
+
+                    if (!user) {
+                        return;
+                    }
+
+                    originalUsername.value = user.username;
+                    usernameInput.value = user.username;
+                    passwordInput.value = user.password;
+                    roleInput.value = user.role;
+                    submitButton.textContent = "Save Changes";
+                    passwordInput.required = false;
+                    usernameInput.focus();
+                };
+            });
+
+            userList.querySelectorAll(".delete-managed-user").forEach(deleteButton => {
+                deleteButton.onclick = () => {
+                    const username = deleteButton.dataset.username;
+
+                    if (!confirm(`Delete user "${username}"?`)) {
+                        return;
+                    }
+
+                    saveUsers(
+                        getUsers().filter(user =>
+                            user.username !== username
+                        )
+                    );
+
+                    renderUsers();
+                };
+            });
+        };
+
+        form.onsubmit = event => {
+            event.preventDefault();
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const role = roleInput.value;
+            const editingUsername = originalUsername.value;
+            const users = getUsers();
+
+            if (!username || (!editingUsername && !password)) {
+                alert("Please complete all required fields.");
+                return;
+            }
+
+            const duplicate = users.some(user =>
+                user.username.toLowerCase() === username.toLowerCase() &&
+                user.username !== editingUsername
+            );
+
+            if (duplicate) {
+                alert("That username already exists.");
+                return;
+            }
+
+            if (editingUsername) {
+                const user = users.find(item =>
+                    item.username === editingUsername
+                );
+
+                if (!user) {
+                    return;
+                }
+
+                user.username = username;
+                user.role = role;
+
+                if (password) {
+                    user.password = password;
+                }
+            } else {
+                users.push({
+                    username,
+                    password,
+                    role
+                });
+            }
+
+            saveUsers(users);
+            resetForm();
+            renderUsers();
+            alert(editingUsername
+                ? "User updated successfully."
+                : "User added successfully."
+            );
+        };
+
+        button.onclick = () => {
+            resetForm();
+            renderUsers();
+            modal.classList.add("open");
+        };
+
+        modal.querySelector(".modal-close").onclick = () => {
+            modal.classList.remove("open");
+            resetForm();
+        };
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        getElement("register-user-button")?.remove();
+        getElement("register-user-modal")?.remove();
+
+        if (
+            sessionStorage.getItem("fms_current_role") ===
+            "Administrator"
+        ) {
+            createUserManagementButton();
+        }
+    });
+})();
