@@ -510,6 +510,7 @@ function renderOrders() {
 
     body.textContent = "";
 
+    cache.order
     const matchingOrders = cache.orders.filter(order =>
         Object.values(order)
             .join(" ")
