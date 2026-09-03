@@ -1,18 +1,9 @@
 (() => {
-    const STORAGE_KEY = "fms_special_requests";
+    const supabaseClient = window.supabaseClient;
+    const TABLE_NAME = "special_requests";
+    let requests = [];
 
-    const getRequests = () => {
-        try {
-            const requests = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            return Array.isArray(requests) ? requests : [];
-        } catch {
-            return [];
-        }
-    };
-
-    const saveRequests = requests => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
-    };
+    const getElement = id => document.getElementById(id);
 
     const escapeValue = value => {
         const element = document.createElement("div");
@@ -23,10 +14,93 @@
     const createId = () =>
         `SR-${String(Date.now()).slice(-6)}`;
 
+    async function getCurrentUser() {
+        const {
+            data: { user }
+        } = await supabaseClient.auth.getUser();
+
+        return user;
+    }
+
+    async function loadRequests() {
+        const { data, error } = await supabaseClient
+            .from(TABLE_NAME)
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Unable to load special requests:", error);
+            alert(
+                "Unable to load special requests. Check the special_requests table and Supabase policies."
+            );
+            requests = [];
+            renderRequests();
+            return;
+        }
+
+        requests = data || [];
+        renderRequests();
+    }
+
+    async function saveRequestToDatabase(request, existingId = "") {
+        const user = await getCurrentUser();
+
+        if (!user) {
+            alert("Please log in first.");
+            return false;
+        }
+
+        const record = {
+            ...request,
+            user_id: user.id,
+            updated_at: new Date().toISOString()
+        };
+
+        const result = existingId
+            ? await supabaseClient
+                .from(TABLE_NAME)
+                .update(record)
+                .eq("id", existingId)
+            : await supabaseClient
+                .from(TABLE_NAME)
+                .insert(record);
+
+        if (result.error) {
+            console.error("Unable to save special request:", result.error);
+            alert(result.error.message);
+            return false;
+        }
+
+        await loadRequests();
+        return true;
+    }
+
+    async function deleteRequestFromDatabase(id) {
+        const user = await getCurrentUser();
+
+        if (!user) {
+            alert("Please log in first.");
+            return;
+        }
+
+        const { error } = await supabaseClient
+            .from(TABLE_NAME)
+            .delete()
+            .eq("id", id);
+
+        if (error) {
+            console.error("Unable to delete special request:", error);
+            alert(error.message);
+            return;
+        }
+
+        await loadRequests();
+    }
+
     function createSpecialRequestInterface() {
         const menu = document.querySelector(".sidebar-menu");
 
-        if (!menu || document.getElementById("special-request-view")) {
+        if (!menu || getElement("special-request-view")) {
             return;
         }
 
@@ -150,101 +224,70 @@
 
             menuItem.classList.add("active");
             view.classList.add("active");
-            document.getElementById("page-title").textContent =
-                "Special Request";
+            getElement("page-title").textContent = "Special Request";
 
             renderRequests();
         };
 
-        document.getElementById("add-special-request").onclick = () =>
+        getElement("add-special-request").onclick = () =>
             openRequestForm();
 
-        document.getElementById("close-special-request").onclick = () =>
-            closeRequestForm();
+        getElement("close-special-request").onclick = closeRequestForm;
 
-        document.getElementById("special-request-form").onsubmit =
-            saveRequest;
+        getElement("special-request-form").onsubmit = saveRequest;
 
         renderRequests();
+        loadRequests();
 
-        setTimeout(showSpecialRequestReminder, 300);
+        setTimeout(showSpecialRequestReminder, 500);
     }
 
     function openRequestForm(id = "") {
-        const request = getRequests().find(item => item.id === id);
-        const form = document.getElementById("special-request-form");
+        const request = requests.find(item => item.id === id);
+        const form = getElement("special-request-form");
 
         form.reset();
 
-        document.getElementById("special-request-id").value =
-            request?.id || "";
-
-        document.getElementById("request-description").value =
-            request?.description || "";
-
-        document.getElementById("request-date").value =
+        getElement("special-request-id").value = request?.id || "";
+        getElement("request-description").value = request?.description || "";
+        getElement("request-date").value =
             request?.requested || new Date().toISOString().slice(0, 10);
+        getElement("request-action").value = request?.action || "";
+        getElement("request-status").value = request?.status || "";
+        getElement("request-completed").value = request?.completed || "";
 
-        document.getElementById("request-action").value =
-            request?.action || "";
-
-        document.getElementById("request-status").value =
-            request?.status || "";
-
-        document.getElementById("request-completed").value =
-            request?.completed || "";
-
-        document.getElementById("special-request-modal-title").textContent =
+        getElement("special-request-modal-title").textContent =
             request ? "Edit Special Request" : "Add New Special Request";
 
-        document
-            .getElementById("special-request-modal")
-            .classList.add("open");
+        getElement("special-request-modal").classList.add("open");
     }
 
     function closeRequestForm() {
-        document
-            .getElementById("special-request-modal")
-            .classList.remove("open");
+        getElement("special-request-modal").classList.remove("open");
     }
 
-    function saveRequest(event) {
+    async function saveRequest(event) {
         event.preventDefault();
 
-        const requests = getRequests();
-        const existingId =
-            document.getElementById("special-request-id").value;
-
-        const status = document.getElementById("request-status").value;
+        const existingId = getElement("special-request-id").value;
+        const status = getElement("request-status").value;
 
         const request = {
             id: existingId || createId(),
-            description: document
-                .getElementById("request-description")
-                .value.trim(),
-            requested: document.getElementById("request-date").value,
-            action: document
-                .getElementById("request-action")
-                .value.trim(),
+            description: getElement("request-description").value.trim(),
+            requested: getElement("request-date").value,
+            action: getElement("request-action").value.trim(),
             status,
-            completed: document.getElementById("request-completed").value
+            completed: getElement("request-completed").value || null
         };
 
         if (status === "Completed" && !request.completed) {
             request.completed = new Date().toISOString().slice(0, 10);
         }
 
-        const index = requests.findIndex(item => item.id === request.id);
-
-        if (index === -1) {
-            requests.unshift(request);
-        } else {
-            requests[index] = request;
+        if (await saveRequestToDatabase(request, existingId)) {
+            closeRequestForm();
         }
-
-        saveRequests(requests);
-        closeRequestForm();
-        renderRequests();
     }
 
     function renderRequests() {
@@ -258,7 +301,7 @@
 
         tableBody.textContent = "";
 
-        getRequests().forEach(request => {
+        requests.forEach(request => {
             const row = document.createElement("tr");
 
             row.innerHTML = `
@@ -299,12 +342,12 @@
                 deleteRequest(button.dataset.deleteRequest);
         });
 
-        const pendingCount = getRequests().filter(request =>
+        const pendingCount = requests.filter(request =>
             request.status !== "Completed" &&
             request.status !== "Cancelled"
         ).length;
 
-        const counter = document.getElementById("special-request-count");
+        const counter = getElement("special-request-count");
 
         if (counter) {
             counter.textContent = pendingCount;
@@ -313,13 +356,15 @@
     }
 
     function showSpecialRequestReminder() {
-        const openRequests = getRequests().filter(request =>
+        const openRequests = requests.filter(request =>
             request.status === "Pending" ||
             request.status === "In Progress"
         );
 
-        if (!openRequests.length ||
-            document.getElementById("special-request-reminder-modal")) {
+        if (
+            !openRequests.length ||
+            getElement("special-request-reminder-modal")
+        ) {
             return;
         }
 
@@ -341,22 +386,18 @@
                 </p>
 
                 <div>
-                    ${openRequests
-                        .map(request => `
-                            <div class="reminder-item">
-                                <strong>
-                                    ${escapeValue(request.status)}
-                                </strong>
-                                <br>
-                                ${escapeValue(request.description)}
-                                <br>
-                                <small>
-                                    Date Requested:
-                                    ${escapeValue(request.requested)}
-                                </small>
-                            </div>
-                        `)
-                        .join("")}
+                    ${openRequests.map(request => `
+                        <div class="reminder-item">
+                            <strong>${escapeValue(request.status)}</strong>
+                            <br>
+                            ${escapeValue(request.description)}
+                            <br>
+                            <small>
+                                Date Requested:
+                                ${escapeValue(request.requested)}
+                            </small>
+                        </div>
+                    `).join("")}
                 </div>
 
                 <button
@@ -391,31 +432,43 @@
     }
 
     function deleteRequest(id) {
+        const remove = () => {
+            if (confirm("Delete this special request?")) {
+                deleteRequestFromDatabase(id);
+            }
+        };
+
         if (typeof requireAdminPassword === "function") {
             requireAdminPassword("delete this special request").then(allowed => {
-                if (allowed && confirm("Delete this special request?")) {
-                    saveRequests(
-                        getRequests().filter(request => request.id !== id)
-                    );
-
-                    renderRequests();
+                if (allowed) {
+                    remove();
                 }
             });
-
             return;
         }
 
-        if (confirm("Delete this special request?")) {
-            saveRequests(
-                getRequests().filter(request => request.id !== id)
-            );
-
-            renderRequests();
-        }
+        remove();
     }
 
-    document.addEventListener(
-        "DOMContentLoaded",
-        createSpecialRequestInterface
-    );
+    function subscribeToSpecialRequestChanges() {
+        supabaseClient
+            .channel("special-request-changes")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: TABLE_NAME
+                },
+                async () => {
+                    await loadRequests();
+                }
+            )
+            .subscribe();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        createSpecialRequestInterface();
+        subscribeToSpecialRequestChanges();
+    });
 })();
