@@ -510,7 +510,7 @@ function renderOrders() {
 
     body.textContent = "";
 
-  cache.orders
+    cache.orders
         .filter(order =>
             Object.values(order)
                 .join(" ")
@@ -544,8 +544,6 @@ function renderOrders() {
 
             body.appendChild(row);
         });
-        body.appendChild(row);
-    });
 
     body.querySelectorAll(".order-edit").forEach(button => {
         button.onclick = () => editWorkOrder(button.dataset.id);
@@ -1210,7 +1208,7 @@ function setupEventHandlers() {
 
     getElement("calendar-year").onchange = renderCalendar;
     getElement("asset-search").oninput = renderAssets;
-    getElement("order-search").oninput = renderOrders;
+
     getElement("download-report").onclick = () => {
         downloadReport(
             "Facilities Management Report",
