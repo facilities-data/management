@@ -510,40 +510,43 @@ function renderOrders() {
 
     body.textContent = "";
 
-    cache.orders
-        .filter(order =>
-            Object.values(order)
-                .join(" ")
-                .toLowerCase()
-                .includes(search)
-        )
-        .slice(0, 10)
-        .forEach(order => {
-            const row = document.createElement("tr");
+    const matchingOrders = cache.orders.filter(order =>
+        Object.values(order)
+            .join(" ")
+            .toLowerCase()
+            .includes(search)
+    );
 
-            row.innerHTML = `
-                <td>${escapeHtml(order.id)}</td>
-                <td>${escapeHtml(order.location)}</td>
-                <td>${escapeHtml(order.category)}</td>
-                <td>${escapeHtml(order.priority)}</td>
-                <td>${escapeHtml(order.description)}</td>
-                <td>${escapeHtml(order.reported)}</td>
-                <td>${escapeHtml(order.completed || "")}</td>
-                <td>${getStatusBadge(order.status)}</td>
-                <td>
-                    <button class="btn-action btn-primary order-edit"
-                        data-id="${escapeHtml(order.id)}">
-                        Edit
-                    </button>
-                    <button class="btn-action btn-danger order-delete"
-                        data-id="${escapeHtml(order.id)}">
-                        Delete
-                    </button>
-                </td>
-            `;
+    const visibleOrders = search
+        ? matchingOrders
+        : matchingOrders.slice(0, 10);
 
-            body.appendChild(row);
-        });
+    visibleOrders.forEach(order => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${escapeHtml(order.id)}</td>
+            <td>${escapeHtml(order.location)}</td>
+            <td>${escapeHtml(order.category)}</td>
+            <td>${escapeHtml(order.priority)}</td>
+            <td>${escapeHtml(order.description)}</td>
+            <td>${escapeHtml(order.reported)}</td>
+            <td>${escapeHtml(order.completed || "")}</td>
+            <td>${getStatusBadge(order.status)}</td>
+            <td>
+                <button class="btn-action btn-primary order-edit"
+                    data-id="${escapeHtml(order.id)}">
+                    Edit
+                </button>
+                <button class="btn-action btn-danger order-delete"
+                    data-id="${escapeHtml(order.id)}">
+                    Delete
+                </button>
+            </td>
+        `;
+
+        body.appendChild(row);
+    });
 
     body.querySelectorAll(".order-edit").forEach(button => {
         button.onclick = () => editWorkOrder(button.dataset.id);
@@ -1208,7 +1211,7 @@ function setupEventHandlers() {
 
     getElement("calendar-year").onchange = renderCalendar;
     getElement("asset-search").oninput = renderAssets;
-
+    getElement("order-search").oninput = renderOrders;
     getElement("download-report").onclick = () => {
         downloadReport(
             "Facilities Management Report",
