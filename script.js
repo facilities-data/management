@@ -462,7 +462,8 @@ async function addOrder(event) {
 
 function renderOrders() {
     const body = document.querySelector("#work-orders-table tbody");
-
+    event.currentTarget.closest(".modal")?.classList.remove("open");
+    
     if (!body) {
         return;
     }
@@ -1285,3 +1286,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     subscribeToChanges();
 });
+}
