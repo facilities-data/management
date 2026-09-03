@@ -456,13 +456,16 @@ async function addOrder(event) {
     if (await saveRecord("orders", order)) {
         event.target.reset();
         getElement("date-reported").value = getToday();
+
+        // Close the Log New Issue modal after dispatching.
+        event.currentTarget.closest(".modal")?.classList.remove("open");
+
         await renderAll();
     }
 }
 
 function renderOrders() {
     const body = document.querySelector("#work-orders-table tbody");
-    event.currentTarget.closest(".modal")?.classList.remove("open");
     
     if (!body) {
         return;
@@ -1286,4 +1289,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     subscribeToChanges();
 });
-}
+
