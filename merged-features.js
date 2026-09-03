@@ -356,12 +356,22 @@
 
         const button = document.createElement("button");
         button.id = "merged-log-issue";
-        button.className = "report-button";
+        button.className = "btn-action btn-primary";
         button.type = "button";
         button.textContent = "+ Log New Issue";
 
-        ordersPanel.querySelector(".section-heading")
-            ?.appendChild(button);
+        const heading = ordersPanel.querySelector(".section-heading");
+        const downloadButton = document.getElementById(
+            "download-orders-report"
+        );
+
+        if (heading) {
+            if (downloadButton) {
+                heading.insertBefore(button, downloadButton);
+            } else {
+                heading.appendChild(button);
+            }
+        }
 
         const modal = document.createElement("div");
         modal.className = "modal";
