@@ -11,8 +11,7 @@
         return element.innerHTML;
     };
 
-    const createId = () =>
-        `SR-${String(Date.now()).slice(-6)}`;
+    const createId = () => crypto.randomUUID();
 
     async function getCurrentUser() {
         const {
