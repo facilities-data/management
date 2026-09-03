@@ -470,27 +470,31 @@ async function addOrder(event) {
         submitButton.textContent = "Saving...";
     }
 
-    // Close immediately so the user does not wait for Supabase or table refreshes.
     form.closest(".modal")?.classList.remove("open");
 
-    form.reset();
-    getElement("date-reported").value = getToday();
+    try {
+        const saved = await saveRecord("orders", order, "", false);
 
-    const saved = await saveRecord("orders", order, "", false);
+        if (!saved) {
+            return;
+        }
 
-    if (!saved) {
+        form.reset();
+        getElement("date-reported").value = getToday();
+
+        // Refresh only work orders so the form is immediately reusable.
+        await loadTable("orders");
+        renderOrders();
+        updateNavigationNotifications();
+    } catch (error) {
+        console.error("Unable to save work order:", error);
+        alert("Unable to save the work order. Please try again.");
+    } finally {
         if (submitButton) {
             submitButton.disabled = false;
             submitButton.textContent = "Dispatch";
         }
-
-        return;
     }
-
-    // Refresh data without blocking the modal interaction.
-    renderAll().catch(error => {
-        console.error("Unable to refresh work orders:", error);
-    });
 }
 
 function renderOrders() {
