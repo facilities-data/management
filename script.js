@@ -108,7 +108,7 @@ async function loadAllData() {
     );
 }
 
-async function saveRecord(key, record, originalId = "") {
+async function saveRecord(key, record, originalId = "", reload = true) {
     const user = await requireLogin();
 
     if (!user) {
@@ -140,7 +140,10 @@ async function saveRecord(key, record, originalId = "") {
         return false;
     }
 
-    await loadTable(key);
+    if (reload) {
+        await loadTable(key);
+    }
+
     return true;
 }
 
@@ -442,6 +445,15 @@ function showApplication() {
 async function addOrder(event) {
     event.preventDefault();
 
+    const form = event.target;
+    const submitButton = form.querySelector(
+        'button[type="submit"], button:not([type])'
+    );
+
+    if (submitButton?.disabled) {
+        return;
+    }
+
     const order = {
         id: createWorkOrderId(),
         location: getElement("location").value.trim(),
@@ -453,20 +465,37 @@ async function addOrder(event) {
         status: "Pending"
     };
 
-    if (await saveRecord("orders", order)) {
-        event.target.reset();
-        getElement("date-reported").value = getToday();
-
-        // Close the Log New Issue modal after dispatching.
-        event.currentTarget.closest(".modal")?.classList.remove("open");
-
-        await renderAll();
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Saving...";
     }
+
+    // Close immediately so the user does not wait for Supabase or table refreshes.
+    form.closest(".modal")?.classList.remove("open");
+
+    form.reset();
+    getElement("date-reported").value = getToday();
+
+    const saved = await saveRecord("orders", order, "", false);
+
+    if (!saved) {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Dispatch";
+        }
+
+        return;
+    }
+
+    // Refresh data without blocking the modal interaction.
+    renderAll().catch(error => {
+        console.error("Unable to refresh work orders:", error);
+    });
 }
 
 function renderOrders() {
     const body = document.querySelector("#work-orders-table tbody");
-    
+
     if (!body) {
         return;
     }
@@ -1289,4 +1318,3 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     subscribeToChanges();
 });
-
