@@ -156,7 +156,6 @@
         document.body.appendChild(modal);
 
         const form = document.getElementById("special-request-form");
-
         const close = () => modal.classList.remove("open");
 
         const openForm = async id => {
@@ -164,16 +163,22 @@
             const request = rows.find(row => row.id === id);
 
             form.reset();
+
             document.getElementById("special-request-record-id").value =
                 request?.id || "";
+
             document.getElementById("special-request-description").value =
                 request?.description || "";
+
             document.getElementById("special-request-date").value =
                 request?.requested || today();
+
             document.getElementById("special-request-action").value =
                 request?.action || "";
+
             document.getElementById("special-request-status").value =
                 request?.status || "";
+
             document.getElementById("special-request-completed").value =
                 request?.completed || "";
 
@@ -347,8 +352,12 @@
             .getElementById("work-orders-table")
             ?.closest(".panel");
 
-        if (!form || !panel || !ordersPanel ||
-            document.getElementById("merged-log-issue")) {
+        if (
+            !form ||
+            !panel ||
+            !ordersPanel ||
+            document.getElementById("merged-log-issue")
+        ) {
             return;
         }
 
@@ -366,6 +375,19 @@
         );
 
         if (heading) {
+            heading.style.justifyContent = "flex-start";
+            heading.style.alignItems = "center";
+            heading.style.gap = "6px";
+
+            const headingTitle = heading.querySelector("h2");
+
+            if (headingTitle) {
+                headingTitle.style.marginRight = "auto";
+            }
+
+            button.style.margin = "0";
+            downloadButton && (downloadButton.style.margin = "0");
+
             if (downloadButton) {
                 heading.insertBefore(button, downloadButton);
             } else {
@@ -417,19 +439,34 @@
                     <style>
                         body { font-family: Arial; color: #1e293b; }
                         h1 { background: #0f766e; color: white; padding: 20px; }
-                        h2 { color: #0f766e; border-left: 5px solid #14b8a6;
-                             padding-left: 10px; }
-                        table { border-collapse: collapse; width: 100%;
-                                margin-bottom: 25px; }
-                        th { background: #0f766e; color: white; }
-                        th, td { border: 1px solid #cbd5e1; padding: 8px;
-                                 text-align: left; }
-                        tr:nth-child(even) { background: #f0fdfa; }
+                        h2 {
+                            color: #0f766e;
+                            border-left: 5px solid #14b8a6;
+                            padding-left: 10px;
+                        }
+                        table {
+                            border-collapse: collapse;
+                            width: 100%;
+                            margin-bottom: 25px;
+                        }
+                        th {
+                            background: #0f766e;
+                            color: white;
+                        }
+                        th, td {
+                            border: 1px solid #cbd5e1;
+                            padding: 8px;
+                            text-align: left;
+                        }
+                        tr:nth-child(even) {
+                            background: #f0fdfa;
+                        }
                     </style>
                 </head>
                 <body>
                     <h1>Facilities Management System</h1>
                     <p>${escapeHtml(title)} — ${today()}</p>
+
                     ${sections.map(section => {
                         const columns = Object.keys(
                             section.rows[0] || { Record: "" }
