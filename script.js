@@ -181,7 +181,7 @@ function createId(prefix, rows, digits = 5, startingNumber = 0) {
 }
 
 function createWorkOrderId() {
-    return createId("WO-", cache.orders, 5, 10000);
+    return createId("WO-", cache.orders, 5, 0);
 }
 
 function createPmsId() {
