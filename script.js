@@ -510,19 +510,18 @@ function renderOrders() {
 
     body.textContent = "";
 
-    cache.order
     const matchingOrders = cache.orders.filter(order =>
-        Object.values(order)
-            .join(" ")
-            .toLowerCase()
-            .includes(search)
-    );
+    Object.values(order)
+        .join(" ")
+        .toLowerCase()
+        .includes(search)
+);
 
-    const visibleOrders = search
-        ? matchingOrders
-        : matchingOrders.slice(0, 10);
+const ordersToDisplay = search
+    ? matchingOrders
+    : matchingOrders.slice(0, 10);
 
-    visibleOrders.forEach(order => {
+ordersToDisplay.forEach(order => {
         const row = document.createElement("tr");
 
         row.innerHTML = `
