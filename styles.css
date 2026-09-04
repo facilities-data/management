@@ -179,6 +179,17 @@ option {
     margin-bottom: 15px;
 }
 
+/* Keep the work-order buttons close together. */
+.workspace .section-heading {
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.workspace .section-heading h2 {
+    margin-right: auto;
+    margin-bottom: 0;
+}
+
 .table-wrap {
     overflow-x: auto;
 }
@@ -325,6 +336,7 @@ button:disabled {
 }
 
 .report-button {
+    margin: 2px;
     padding: 8px 11px;
     border: 0;
     border-radius: 5px;
@@ -623,6 +635,15 @@ button:disabled {
     .header-date {
         display: block;
         margin: 8px 0;
+    }
+
+    .workspace .section-heading {
+        align-items: flex-start;
+    }
+
+    .workspace .section-heading h2 {
+        width: 100%;
+        margin-right: 0;
     }
 }
 
