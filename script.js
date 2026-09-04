@@ -1293,6 +1293,8 @@ async function initializeData() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    getElement("login-form").onsubmit = handleLogin;
+
     const {
         data: { session }
     } = await supabaseClient.auth.getSession();
@@ -1303,6 +1305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             "fms_current_user",
             session.user.email || ""
         );
+
         sessionStorage.setItem("fms_current_role", "Administrator");
 
         showApplication();
@@ -1312,14 +1315,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.querySelector(".main-content").style.display = "none";
     }
 
-    supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
-        if (event === "SIGNED_OUT" || !sessionState) {
-            document.querySelector(".sidebar").style.display = "none";
-            document.querySelector(".main-content").style.display = "none";
-            getElement("login-screen")?.classList.remove("hidden");
-            return;
-        }
+    // Leave this disabled while WebSocket is unavailable.
+    // subscribeToChanges();
+});
 
-        showApplication();
-    });
 });
