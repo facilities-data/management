@@ -1322,6 +1322,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         showApplication();
     });
-
-    subscribeToChanges();
 });
