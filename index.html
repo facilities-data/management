@@ -16,24 +16,16 @@
             <form id="login-form">
                 <div class="form-group">
                     <label for="login-username">Email Address</label>
-                    <input
-                        id="login-username"
-                        type="email"
+                    <input id="login-username" type="email"
                         placeholder="Enter email address"
-                        autocomplete="username"
-                        required
-                    >
+                        autocomplete="username" required>
                 </div>
 
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input
-                        id="login-password"
-                        type="password"
+                    <input id="login-password" type="password"
                         placeholder="Enter password"
-                        autocomplete="current-password"
-                        required
-                    >
+                        autocomplete="current-password" required>
                 </div>
 
                 <div id="login-error" class="login-error">
@@ -59,8 +51,6 @@
                     <li data-target="pms-view">52 Weeks PMS Calendar</li>
                     <li data-target="work-orders-view">Active Work Orders</li>
                 </ul>
-
-                
             </li>
 
             <li data-target="projects-view">
@@ -78,16 +68,12 @@
                 <span class="nav-count" id="vendors-count"></span>
             </li>
         </ul>
-        
-        <button
-    type="button"
-    id="logout-button"
-    class="btn-action btn-danger"
-    style="width:calc(100% - 30px);margin:20px 15px 0"
->
-    Log Out
-</button>
 
+        <button type="button" id="logout-button"
+            class="btn-action btn-danger"
+            style="width:calc(100% - 30px);margin:20px 15px 0">
+            Log Out
+        </button>
     </nav>
 
     <main class="main-content">
@@ -130,16 +116,10 @@
                     <h2>52-Week Preventive Maintenance Calendar</h2>
 
                     <div>
-                        <input
-    id="calendar-year"
-    type="number"
-    min="1900"
-    max="9999"
-    step="1"
-    value="2026"
-    title="Enter calendar year"
-    aria-label="Enter calendar year"
->
+                        <input id="calendar-year" type="number"
+                            min="1900" max="9999" step="1" value="2026"
+                            title="Enter calendar year"
+                            aria-label="Enter calendar year">
 
                         <button class="btn-action btn-primary" id="add-pms">
                             + Add PMS Task
@@ -163,16 +143,23 @@
                     <div class="section-heading">
                         <h2>Active Maintenance Work Orders</h2>
 
-                        <button class="report-button" id="download-orders-report">
-                            Download Work Orders
-                        </button>
+                        <div>
+                            <button type="button"
+                                class="btn-action btn-primary"
+                                id="log-new-issue"
+                                onclick="document.getElementById('facility-form').scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => document.getElementById('location')?.focus(), 400);">
+                                + Log New Issue
+                            </button>
+
+                            <button class="report-button" id="download-orders-report">
+                                Download Work Orders
+                            </button>
+                        </div>
                     </div>
 
-                    <input
-    class="search"
-    id="order-search"
-    placeholder="Search work orders by ID, location, category, priority, description, or status"
->
+                    <input class="search" id="order-search"
+                        placeholder="Search work orders by ID, location, category, priority, description, or status">
+
                     <div class="table-wrap">
                         <table id="work-orders-table">
                             <thead>
@@ -200,7 +187,6 @@
                         <div class="form-group">
                             <label for="date-reported">Date Reported</label>
                             <input type="date" id="date-reported" required>
-                           
                         </div>
 
                         <div class="form-group">
@@ -360,15 +346,15 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Upcoming PMS Reminder</h2>
-                <button type="button" class="modal-close" data-close="reminder-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="reminder-modal">&times;</button>
             </div>
 
             <p>Tasks due within the next 30 days:</p>
             <div id="reminder-list"></div>
 
-            <button type="button" class="btn-submit" data-close="reminder-modal">
+            <button type="button" class="btn-submit"
+                data-close="reminder-modal">
                 Acknowledge Reminder
             </button>
         </div>
@@ -378,9 +364,8 @@
         <div class="modal-content password-card">
             <div class="modal-header">
                 <h2>Administrator Verification</h2>
-                <button type="button" class="modal-close" data-close="admin-password-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="admin-password-modal">&times;</button>
             </div>
 
             <p id="password-action-text">
@@ -416,9 +401,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Add or Update Project</h2>
-                <button type="button" class="modal-close" data-close="project-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="project-modal">&times;</button>
             </div>
 
             <form id="project-form">
@@ -447,8 +431,9 @@
                 <div class="form-group">
                     <label for="project-status">Status</label>
                     <select id="project-status" required>
-                      <option value="" disabled selected hidden data-placeholder>
-                            Select Project Status</option>
+                        <option value="" disabled selected hidden data-placeholder>
+                            Select Project Status
+                        </option>
                         <option>Planned</option>
                         <option>In Progress</option>
                         <option>On Hold</option>
@@ -465,9 +450,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Add or Update PMS Task</h2>
-                <button type="button" class="modal-close" data-close="pms-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="pms-modal">&times;</button>
             </div>
 
             <form id="pms-form">
@@ -486,8 +470,9 @@
                 <div class="form-group">
                     <label for="pms-type">Maintenance Type</label>
                     <select id="pms-type" required>
-                      <option value="" disabled selected hidden data-placeholder>
-                            Maintenance Type</option>
+                        <option value="" disabled selected hidden data-placeholder>
+                            Maintenance Type
+                        </option>
                         <option>Preventive Maintenance</option>
                         <option>Predictive Maintenance</option>
                         <option>Condition-Based Maintenance</option>
@@ -505,8 +490,9 @@
                 <div class="form-group">
                     <label for="pms-status">Status</label>
                     <select id="pms-status" required>
-                      <option value="" disabled selected hidden data-placeholder>
-                            Select PMS Status</option>
+                        <option value="" disabled selected hidden data-placeholder>
+                            Select PMS Status
+                        </option>
                         <option>In Progress</option>
                         <option>Done</option>
                     </select>
@@ -521,9 +507,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Add or Update Vendor</h2>
-                <button type="button" class="modal-close" data-close="vendor-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="vendor-modal">&times;</button>
             </div>
 
             <form id="vendor-form">
@@ -575,9 +560,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="asset-modal-title">Register New Asset</h2>
-                <button type="button" class="modal-close" data-close="asset-modal">
-                    &times;
-                </button>
+                <button type="button" class="modal-close"
+                    data-close="asset-modal">&times;</button>
             </div>
 
             <form id="asset-form">
@@ -596,7 +580,9 @@
                 <div class="form-group">
                     <label for="asset-status">Health Status</label>
                     <select id="asset-status" required>
-                      <option value="" disabled selected hidden data-placeholder>Select Health Status</option>
+                        <option value="" disabled selected hidden data-placeholder>
+                            Select Health Status
+                        </option>
                         <option>Operational</option>
                         <option>Attention Needed</option>
                         <option>Out of Service</option>
@@ -627,52 +613,52 @@
             color: #94a3b8;
         }
     </style>
+
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const logoutButton = document.getElementById("logout-button");
+        document.addEventListener("DOMContentLoaded", () => {
+            const logoutButton = document.getElementById("logout-button");
 
-        if (!logoutButton) {
-            return;
-        }
-
-        logoutButton.addEventListener("click", () => {
-            if (!window.confirm("Are you sure you want to log out?")) {
+            if (!logoutButton) {
                 return;
             }
 
-            sessionStorage.removeItem("fms_logged_in");
-            sessionStorage.removeItem("fms_current_user");
-            sessionStorage.removeItem("fms_current_role");
+            logoutButton.addEventListener("click", () => {
+                if (!window.confirm("Are you sure you want to log out?")) {
+                    return;
+                }
 
-            const loginScreen = document.getElementById("login-screen");
-            const sidebar = document.querySelector(".sidebar");
-            const mainContent = document.querySelector(".main-content");
-            const loginForm = document.getElementById("login-form");
-            const loginError = document.getElementById("login-error");
+                sessionStorage.removeItem("fms_logged_in");
+                sessionStorage.removeItem("fms_current_user");
+                sessionStorage.removeItem("fms_current_role");
 
-            loginScreen.classList.remove("hidden");
-            loginScreen.style.display = "flex";
-            sidebar.style.display = "none";
-            mainContent.style.display = "none";
+                const loginScreen = document.getElementById("login-screen");
+                const sidebar = document.querySelector(".sidebar");
+                const mainContent = document.querySelector(".main-content");
+                const loginForm = document.getElementById("login-form");
+                const loginError = document.getElementById("login-error");
 
-            loginForm?.reset();
-            loginError?.classList.remove("visible");
-            document.getElementById("login-username")?.focus();
+                loginScreen.classList.remove("hidden");
+                loginScreen.style.display = "flex";
+                sidebar.style.display = "none";
+                mainContent.style.display = "none";
+
+                loginForm?.reset();
+                loginError?.classList.remove("visible");
+                document.getElementById("login-username")?.focus();
+            });
         });
-    });
-</script>
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-    window.supabaseClient = window.supabase.createClient(
-        "https://xoysdiavwxfuqygzonjt.supabase.co",
-        "sb_publishable_PhsG6yDViBKKi29sKAgHtw_YUMVTF0J"
-    );
-</script>
+        window.supabaseClient = window.supabase.createClient(
+            "https://xoysdiavwxfuqygzonjt.supabase.co",
+            "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d"
+        );
+    </script>
 
-<script src="special-request.js"></script>
-
-<script src="script.js"></script>
-
+    <script src="special-request.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
