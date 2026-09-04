@@ -510,15 +510,18 @@ function renderOrders() {
 
     body.textContent = "";
 
-    cache.orders
-        .filter(order =>
-            Object.values(order)
-                .join(" ")
-                .toLowerCase()
-                .includes(search)
-        )
-        .slice(0, 10)
-        .forEach(order => {
+    const matchingOrders = cache.orders.filter(order =>
+    Object.values(order)
+        .join(" ")
+        .toLowerCase()
+        .includes(search)
+);
+
+const ordersToDisplay = search
+    ? matchingOrders
+    : matchingOrders.slice(0, 10);
+
+ordersToDisplay.forEach(order => {
             const row = document.createElement("tr");
 
             row.innerHTML = `
@@ -1208,7 +1211,7 @@ function setupEventHandlers() {
 
     getElement("calendar-year").onchange = renderCalendar;
     getElement("asset-search").oninput = renderAssets;
-
+    getElement("order-search").oninput = renderOrders;
     getElement("download-report").onclick = () => {
         downloadReport(
             "Facilities Management Report",
