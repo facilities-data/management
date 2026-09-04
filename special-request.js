@@ -34,11 +34,12 @@
             );
             requests = [];
             renderRequests();
-            return;
+            return false;
         }
 
         requests = data || [];
         renderRequests();
+        return true;
     }
 
     async function saveRequestToDatabase(request, existingId = "") {
@@ -96,7 +97,7 @@
         await loadRequests();
     }
 
-    function createSpecialRequestInterface() {
+    async function createSpecialRequestInterface() {
         const menu = document.querySelector(".sidebar-menu");
 
         if (!menu || getElement("special-request-view")) {
@@ -236,7 +237,9 @@
         getElement("special-request-form").onsubmit = saveRequest;
 
         renderRequests();
-        loadRequests();
+
+        // Wait for data before checking whether a reminder is needed.
+        await loadRequests();
 
         setTimeout(showSpecialRequestReminder, 500);
     }
