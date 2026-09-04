@@ -1314,7 +1314,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.querySelector(".sidebar").style.display = "none";
         document.querySelector(".main-content").style.display = "none";
     }
-
+ supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
+        if (event === "SIGNED_OUT" || !sessionState) {
+            document.querySelector(".sidebar").style.display = "none";
+            document.querySelector(".main-content").style.display = "none";
+            getElement("login-screen")?.classList.remove("hidden");
+            return;
+        }
     // Leave this disabled while WebSocket is unavailable.
     // subscribeToChanges();
 });
