@@ -2,6 +2,7 @@
     const supabaseClient = window.supabaseClient;
     const TABLE_NAME = "special_requests";
     let requests = [];
+    let reminderLoadStarted = false;
 
     const getElement = id => document.getElementById(id);
 
@@ -40,6 +41,26 @@
         requests = data || [];
         renderRequests();
         return true;
+    }
+
+    async function initializeSpecialRequestReminder() {
+        if (reminderLoadStarted) {
+            return;
+        }
+
+        const user = await getCurrentUser();
+
+        if (!user) {
+            return;
+        }
+
+        reminderLoadStarted = true;
+
+        const loaded = await loadRequests();
+
+        if (loaded) {
+            setTimeout(showSpecialRequestReminder, 500);
+        }
     }
 
     async function saveRequestToDatabase(request, existingId = "") {
@@ -97,7 +118,7 @@
         await loadRequests();
     }
 
-    async function createSpecialRequestInterface() {
+    function createSpecialRequestInterface() {
         const menu = document.querySelector(".sidebar-menu");
 
         if (!menu || getElement("special-request-view")) {
@@ -233,15 +254,9 @@
             openRequestForm();
 
         getElement("close-special-request").onclick = closeRequestForm;
-
         getElement("special-request-form").onsubmit = saveRequest;
 
         renderRequests();
-
-        // Wait for data before checking whether a reminder is needed.
-        await loadRequests();
-
-        setTimeout(showSpecialRequestReminder, 500);
     }
 
     function openRequestForm(id = "") {
@@ -471,6 +486,21 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         createSpecialRequestInterface();
+
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (
+                session &&
+                (event === "SIGNED_IN" || event === "INITIAL_SESSION")
+            ) {
+                setTimeout(initializeSpecialRequestReminder, 1000);
+            }
+
+            if (event === "SIGNED_OUT") {
+                reminderLoadStarted = false;
+                requests = [];
+            }
+        });
+
         // subscribeToSpecialRequestChanges();
     });
 })();
