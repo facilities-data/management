@@ -468,6 +468,5 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         createSpecialRequestInterface();
-        subscribeToSpecialRequestChanges();
     });
 })();
