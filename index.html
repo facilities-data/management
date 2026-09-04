@@ -673,7 +673,62 @@
         "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d"
     );
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const button = document.getElementById("add-work-order");
+    const form = document.getElementById("facility-form");
+    const originalPanel = form?.closest(".panel");
 
+    if (!button || !form) {
+        return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "work-order-modal";
+    modal.className = "modal";
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Log New Issue</h2>
+                <button type="button" class="modal-close" id="close-work-order-modal">
+                    &times;
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.querySelector(".modal-content").appendChild(form);
+
+    if (originalPanel) {
+        originalPanel.style.display = "none";
+    }
+
+    const closeModal = () => {
+        modal.classList.remove("open");
+    };
+
+    button.addEventListener("click", () => {
+        form.reset();
+        document.getElementById("date-reported").value =
+            new Date().toISOString().slice(0, 10);
+
+        modal.classList.add("open");
+        document.getElementById("location")?.focus();
+    });
+
+    document
+        .getElementById("close-work-order-modal")
+        .addEventListener("click", closeModal);
+
+    modal.addEventListener("click", event => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+});
+</script>
 <script src="special-request.js"></script>
 
 <script src="script.js"></script>
