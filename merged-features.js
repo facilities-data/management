@@ -320,29 +320,8 @@
     }
 
     function addWorkOrderSearch() {
-        const table = document.querySelector("#work-orders-table");
-
-        if (!table || document.getElementById("merged-order-search")) {
-            return;
-        }
-
-        const input = document.createElement("input");
-        input.id = "merged-order-search";
-        input.className = "search";
-        input.placeholder =
-            "Search work orders by ID, location, category, priority, or status";
-
-        table.closest(".panel")
-            ?.querySelector(".section-heading")
-            ?.insertAdjacentElement("afterend", input);
-
-        input.oninput = () => {
-            const search = input.value.toLowerCase().trim();
-
-            table.querySelectorAll("tbody tr").forEach(row => {
-                row.hidden = !row.textContent.toLowerCase().includes(search);
-            });
-        };
+        // Work-order search is already provided by index.html and script.js.
+        return;
     }
 
     function addLogIssueModal() {
