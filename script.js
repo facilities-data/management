@@ -419,10 +419,17 @@ async function logout() {
 
     sessionStorage.clear();
 
+    getElement("login-form")?.reset();
+    getElement("login-username").value = "";
+    getElement("login-password").value = "";
+    getElement("login-error")?.classList.remove("visible");
+    
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
     document.querySelector(".sidebar").style.display = "none";
     document.querySelector(".main-content").style.display = "none";
+
+    getElement("login-username")?.focus();
 }
 
 function showApplication() {
