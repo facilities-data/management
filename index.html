@@ -630,41 +630,7 @@
             color: #94a3b8;
         }
     </style>
-    <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const logoutButton = document.getElementById("logout-button");
-
-        if (!logoutButton) {
-            return;
-        }
-
-        logoutButton.addEventListener("click", () => {
-            if (!window.confirm("Are you sure you want to log out?")) {
-                return;
-            }
-
-            sessionStorage.removeItem("fms_logged_in");
-            sessionStorage.removeItem("fms_current_user");
-            sessionStorage.removeItem("fms_current_role");
-
-            const loginScreen = document.getElementById("login-screen");
-            const sidebar = document.querySelector(".sidebar");
-            const mainContent = document.querySelector(".main-content");
-            const loginForm = document.getElementById("login-form");
-            const loginError = document.getElementById("login-error");
-
-            loginScreen.classList.remove("hidden");
-            loginScreen.style.display = "flex";
-            sidebar.style.display = "none";
-            mainContent.style.display = "none";
-
-            loginForm?.reset();
-            loginError?.classList.remove("visible");
-            document.getElementById("login-username")?.focus();
-        });
-    });
-</script>
-
+    
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
