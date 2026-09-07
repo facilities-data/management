@@ -128,7 +128,7 @@
         const menuItem = document.createElement("li");
         menuItem.dataset.target = "special-request-view";
         menuItem.innerHTML = `
-            Special Request
+            Other Task
             <span class="nav-count" id="special-request-count"></span>
         `;
         menu.appendChild(menuItem);
@@ -139,14 +139,14 @@
         view.innerHTML = `
             <section class="panel">
                 <div class="section-heading">
-                    <h2>Special Requests</h2>
+                    <h2>Other Task</h2>
 
                     <button
                         type="button"
                         class="btn-action btn-primary"
                         id="add-special-request"
                     >
-                        + Add New Request
+                        + Add New Task
                     </button>
                 </div>
 
@@ -154,7 +154,7 @@
                     <table id="special-requests-table">
                         <thead>
                             <tr>
-                                <th>Request Description</th>
+                                <th>Task Description</th>
                                 <th>Date Requested</th>
                                 <th>Action Taken</th>
                                 <th>Status</th>
@@ -177,7 +177,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 id="special-request-modal-title">
-                        Add New Special Request
+                        Add New Task
                     </h2>
 
                     <button
@@ -194,7 +194,7 @@
 
                     <div class="form-group">
                         <label for="request-description">
-                            Request Description
+                            Task Description
                         </label>
                         <textarea id="request-description" required></textarea>
                     </div>
@@ -213,7 +213,7 @@
                         <label for="request-status">Status</label>
                         <select id="request-status" required>
                             <option value="" disabled selected hidden>
-                                Select Request Status
+                                Select Task Status
                             </option>
                             <option>Pending</option>
                             <option>In Progress</option>
@@ -230,7 +230,7 @@
                     </div>
 
                     <button type="submit" class="btn-submit">
-                        Save Request
+                        Save Task
                     </button>
                 </form>
             </div>
@@ -274,7 +274,7 @@
         getElement("request-completed").value = request?.completed || "";
 
         getElement("special-request-modal-title").textContent =
-            request ? "Edit Special Request" : "Add New Special Request";
+            request ? "Edit Other Task" : "Add New Task";
 
         getElement("special-request-modal").classList.add("open");
     }
