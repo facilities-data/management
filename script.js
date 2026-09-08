@@ -20,6 +20,47 @@ let passwordResolver = null;
 
 const getElement = id => document.getElementById(id);
 
+function playNotificationSound(type = "success") {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContext) {
+        return;
+    }
+
+    try {
+        const context = new AudioContext();
+        const tones = {
+            reminder: [440, 660],
+            save: [660, 880],
+            delete: [520, 360],
+            success: [660, 880]
+        };
+        const frequencies = tones[type] || tones.success;
+        const start = context.currentTime;
+
+        frequencies.forEach((frequency, index) => {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const toneStart = start + index * 0.12;
+
+            oscillator.type = "sine";
+            oscillator.frequency.value = frequency;
+            gain.gain.setValueAtTime(0.0001, toneStart);
+            gain.gain.exponentialRampToValueAtTime(0.12, toneStart + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.18);
+
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start(toneStart);
+            oscillator.stop(toneStart + 0.2);
+        });
+
+        setTimeout(() => context.close(), 600);
+    } catch (error) {
+        console.warn("Notification sound unavailable:", error);
+    }
+}
+
 function getToday() {
     return new Date().toISOString().slice(0, 10);
 }
@@ -140,6 +181,8 @@ async function saveRecord(key, record, originalId = "", reload = true) {
         return false;
     }
 
+    playNotificationSound("save");
+
     if (reload) {
         await loadTable(key);
     }
@@ -165,6 +208,7 @@ async function deleteRecord(key, id) {
         return false;
     }
 
+    playNotificationSound("delete");
     await loadTable(key);
     return true;
 }
@@ -238,7 +282,13 @@ function confirmAdminPassword(event) {
     closeModal("admin-password-modal");
 
     if (resolve) {
-        resolve(Boolean(getElement("admin-password").value));
+        const authorized = Boolean(getElement("admin-password").value);
+
+        if (authorized) {
+            playNotificationSound("delete");
+        }
+
+        resolve(authorized);
     }
 }
 
@@ -1135,6 +1185,7 @@ function showReminder() {
         .join("");
 
     openModal("reminder-modal");
+    playNotificationSound("reminder");
 }
 
 async function renderAll() {
@@ -1285,7 +1336,7 @@ async function initializeData() {
     await renderAll();
 
     subscribeToChanges();
-    
+
     showReminder();
 
     setTimeout(() => {
@@ -1331,8 +1382,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             getElement("login-screen")?.classList.remove("hidden");
             return;
         }
-    // Leave this disabled while WebSocket is unavailable.
-    // subscribeToChanges();
+    
 });
 
 });
