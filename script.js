@@ -1283,6 +1283,9 @@ async function initializeData() {
     setupEventHandlers();
 
     await renderAll();
+
+    subscribeToChanges();
+    
     showReminder();
 
     setTimeout(() => {
