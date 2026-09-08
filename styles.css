@@ -697,3 +697,34 @@ button:disabled {
 .issue-form-modal .modal-content {
     width: min(520px, 100%);
 }
+
+.barcode-scanner-card {
+    width: min(520px, 100%);
+}
+
+#barcode-video {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    background: #0f172a;
+    object-fit: cover;
+}
+
+.barcode-status {
+    min-height: 42px;
+    margin-bottom: 12px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+#stop-barcode-scanner {
+    width: 100%;
+    padding: 11px;
+    border: 0;
+    border-radius: 6px;
+    color: #134e4a;
+    background: #ccfbf1;
+    font-weight: 600;
+}
