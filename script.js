@@ -92,6 +92,22 @@ function closeModal(id) {
     }
 }
 
+function showNotification(message) {
+    const notification = getElement("app-notification");
+
+    if (!notification) {
+        alert(message);
+        return;
+    }
+
+    notification.textContent = message;
+    notification.classList.add("visible");
+    clearTimeout(showNotification.timer);
+    showNotification.timer = setTimeout(() => {
+        notification.classList.remove("visible");
+    }, 4500);
+}
+
 function getStatusBadge(status) {
     let className = "pending";
 
@@ -1375,9 +1391,20 @@ async function scanBarcodeFrame() {
         const barcode = barcodes.find(item => item.rawValue);
 
         if (barcode) {
-            getElement("asset-tag").value = barcode.rawValue;
+            const scannedTag = barcode.rawValue.trim();
+            const asset = cache.assets.find(item =>
+                String(item.id || "").trim().toLowerCase() === scannedTag.toLowerCase()
+            );
+
             closeModal("barcode-scanner-modal");
-            getElement("asset-tag").focus();
+
+            if (!asset) {
+                showNotification(`Barcode “${scannedTag}” was not found in the asset register.`);
+                return;
+            }
+
+            editAsset(asset.id);
+            showNotification(`Asset “${scannedTag}” found.`);
             return;
         }
     } catch (error) {
@@ -1438,7 +1465,6 @@ function setupEventHandlers() {
     getElement("add-vendor").onclick = () => editVendor();
     getElement("btn-add-asset").onclick = () => editAsset();
     getElement("scan-asset-barcode").onclick = () => {
-        editAsset();
         startBarcodeScanner();
     };
     getElement("close-barcode-scanner").onclick = () => closeModal("barcode-scanner-modal");
