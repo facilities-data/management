@@ -18,6 +18,9 @@ const cache = {
 
 let passwordResolver = null;
 let presenceChannel = null;
+let barcodeStream = null;
+let barcodeDetector = null;
+let barcodeScanFrame = null;
 
 const getElement = id => document.getElementById(id);
 
@@ -78,6 +81,10 @@ function openModal(id) {
 
 function closeModal(id) {
     getElement(id)?.classList.remove("open");
+
+    if (id === "barcode-scanner-modal") {
+        stopBarcodeScanner();
+    }
 
     if (id === "admin-password-modal" && passwordResolver) {
         passwordResolver(false);
@@ -467,10 +474,8 @@ async function handleLogin(event) {
 }
 
 async function logout() {
-    // Clear the local UI first so logout never waits on a slow network request.
-    stopPresence().catch(error =>
-        console.warn("Unable to stop presence during logout:", error)
-    );
+    await stopPresence();
+    await supabaseClient.auth.signOut();
 
     sessionStorage.clear();
 
@@ -479,17 +484,13 @@ async function logout() {
     getElement("login-password").value = "";
     getElement("login-error")?.classList.remove("visible");
     updateSignedInAccount(null);
-
+    
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
     document.querySelector(".sidebar").style.display = "none";
     document.querySelector(".main-content").style.display = "none";
-    getElement("login-username")?.focus();
 
-    // Supabase cleanup continues without blocking the logout experience.
-    supabaseClient.auth.signOut().catch(error =>
-        console.warn("Unable to complete remote sign-out:", error)
-    );
+    getElement("login-username")?.focus();
 }
 
 function updateSignedInAccount(user) {
@@ -900,6 +901,7 @@ function editAsset(id = "") {
         asset ? "Update Asset" : "Register New Asset";
 
     getElement("asset-id").value = asset?.id || "";
+    getElement("asset-tag").value = asset?.id || "";
     getElement("asset-name").value = asset?.name || "";
     getElement("asset-location").value = asset?.location || "";
     getElement("asset-status").value = asset?.status || "";
@@ -912,7 +914,13 @@ async function saveAsset(event) {
     event.preventDefault();
 
     const originalId = getElement("asset-id").value;
-    const id = originalId || createAssetTag();
+    const enteredTag = getElement("asset-tag").value.trim();
+    const id = enteredTag || originalId || createAssetTag();
+
+    if (cache.assets.some(asset => asset.id === id && asset.id !== originalId)) {
+        alert("That asset tag is already in use.");
+        return;
+    }
 
     const asset = {
         id,
@@ -1338,6 +1346,82 @@ function downloadReport(title, rows, fileName) {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
+function stopBarcodeScanner() {
+    if (barcodeScanFrame) {
+        cancelAnimationFrame(barcodeScanFrame);
+        barcodeScanFrame = null;
+    }
+
+    barcodeStream?.getTracks().forEach(track => track.stop());
+    barcodeStream = null;
+
+    const video = getElement("barcode-video");
+
+    if (video) {
+        video.pause();
+        video.srcObject = null;
+    }
+}
+
+async function scanBarcodeFrame() {
+    const video = getElement("barcode-video");
+
+    if (!video || !barcodeDetector || !barcodeStream) {
+        return;
+    }
+
+    try {
+        const barcodes = await barcodeDetector.detect(video);
+        const barcode = barcodes.find(item => item.rawValue);
+
+        if (barcode) {
+            getElement("asset-tag").value = barcode.rawValue;
+            closeModal("barcode-scanner-modal");
+            getElement("asset-tag").focus();
+            return;
+        }
+    } catch (error) {
+        console.warn("Barcode scan failed:", error);
+    }
+
+    barcodeScanFrame = requestAnimationFrame(scanBarcodeFrame);
+}
+
+async function startBarcodeScanner() {
+    const errorElement = getElement("barcode-scan-error");
+
+    if (!("BarcodeDetector" in window)) {
+        alert("Barcode scanning is not supported by this mobile browser. Enter the asset tag manually.");
+        return;
+    }
+
+    try {
+        barcodeDetector = new BarcodeDetector({
+            formats: [
+                "code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "qr_code"
+            ]
+        });
+        barcodeStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+        });
+
+        const video = getElement("barcode-video");
+        video.srcObject = barcodeStream;
+        await video.play();
+        errorElement.textContent = "";
+        errorElement.style.display = "none";
+        openModal("barcode-scanner-modal");
+        barcodeScanFrame = requestAnimationFrame(scanBarcodeFrame);
+    } catch (error) {
+        stopBarcodeScanner();
+        console.error("Unable to access barcode scanner:", error);
+        errorElement.textContent = "Camera access was denied or unavailable. Allow camera access and try again, or enter the asset tag manually.";
+        errorElement.style.display = "block";
+        openModal("barcode-scanner-modal");
+    }
+}
+
 function setupEventHandlers() {
     getElement("login-form").onsubmit = handleLogin;
     getElement("facility-form").onsubmit = addOrder;
@@ -1353,6 +1437,11 @@ function setupEventHandlers() {
     getElement("add-pms").onclick = () => editPms();
     getElement("add-vendor").onclick = () => editVendor();
     getElement("btn-add-asset").onclick = () => editAsset();
+    getElement("scan-asset-barcode").onclick = () => {
+        editAsset();
+        startBarcodeScanner();
+    };
+    getElement("close-barcode-scanner").onclick = () => closeModal("barcode-scanner-modal");
 
     getElement("calendar-year").onchange = renderCalendar;
     getElement("asset-search").oninput = renderAssets;
