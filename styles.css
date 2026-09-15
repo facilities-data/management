@@ -93,6 +93,77 @@ header {
     border-bottom: 2px solid var(--line);
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.signed-in-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--nav);
+    background: #ecfeff;
+    font-size: 13px;
+}
+
+.signed-in-label {
+    color: var(--muted);
+}
+
+.active-users {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--nav);
+    background: #ecfeff;
+    font-size: 13px;
+}
+
+.active-users-label {
+    color: var(--muted);
+}
+
+.active-users-list {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    right: 0;
+    display: none;
+    min-width: 220px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: #134e4a;
+    background: #fff;
+    box-shadow: 0 8px 20px #0002;
+}
+
+.active-users:hover .active-users-list,
+.active-users:focus-within .active-users-list {
+    display: block;
+}
+
+.active-user {
+    padding: 6px 4px;
+    border-bottom: 1px solid #ccfbf1;
+    font-size: 13px;
+}
+
+.active-user:last-child {
+    border-bottom: 0;
+}
+
 header h1 {
     color: var(--nav);
     font-size: 26px;
@@ -632,6 +703,11 @@ button:disabled {
         display: block;
     }
 
+    .header-actions {
+        justify-content: flex-start;
+        margin-top: 8px;
+    }
+
     .header-date {
         display: block;
         margin: 8px 0;
@@ -696,35 +772,4 @@ button:disabled {
 
 .issue-form-modal .modal-content {
     width: min(520px, 100%);
-}
-
-.barcode-scanner-card {
-    width: min(520px, 100%);
-}
-
-#barcode-video {
-    display: block;
-    width: 100%;
-    min-height: 220px;
-    margin-bottom: 12px;
-    border-radius: 8px;
-    background: #0f172a;
-    object-fit: cover;
-}
-
-.barcode-status {
-    min-height: 42px;
-    margin-bottom: 12px;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-#stop-barcode-scanner {
-    width: 100%;
-    padding: 11px;
-    border: 0;
-    border-radius: 6px;
-    color: #134e4a;
-    background: #ccfbf1;
-    font-weight: 600;
 }
