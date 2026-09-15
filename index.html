@@ -41,42 +41,6 @@
                 </div>
 
                 <button type="submit" class="btn-submit">Log In</button>
-
-                <button type="button" class="btn-register" id="open-register-user">
-                    Register New User
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <div id="register-user-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Register New User</h2>
-                <button type="button" class="modal-close" data-close="register-user-modal">
-                    &times;
-                </button>
-            </div>
-
-            <p id="register-user-message" class="register-user-message"></p>
-
-            <form id="register-user-form">
-                <div class="form-group">
-                    <label for="register-email">Email Address</label>
-                    <input id="register-email" type="email" required autocomplete="email">
-                </div>
-
-                <div class="form-group">
-                    <label for="register-password">Password</label>
-                    <input id="register-password" type="password" required minlength="6" autocomplete="new-password">
-                </div>
-
-                <div class="form-group">
-                    <label for="register-confirm-password">Confirm Password</label>
-                    <input id="register-confirm-password" type="password" required minlength="6" autocomplete="new-password">
-                </div>
-
-                <button type="submit" class="btn-submit">Create User</button>
             </form>
         </div>
     </div>
@@ -130,7 +94,16 @@
         <header>
             <h1 id="page-title">Facilities Management</h1>
 
-            <div>
+            <div class="header-actions">
+                <div class="signed-in-user" aria-live="polite">
+                    <span class="signed-in-label">Signed in as</span>
+                    <strong id="signed-in-account">—</strong>
+                </div>
+                <div class="active-users" aria-live="polite">
+                    <span class="active-users-label">Active now</span>
+                    <strong id="active-users-count">0</strong>
+                    <div id="active-users-list" class="active-users-list"></div>
+                </div>
                 <span id="current-date" class="header-date"></span>
                 <button class="btn-action btn-success" id="download-report">
                     Download All Excel Data
@@ -666,7 +639,7 @@
             color: #94a3b8;
         }
     </style>
-   
+    
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
