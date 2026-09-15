@@ -605,6 +605,37 @@ button:disabled {
     display: block;
 }
 
+.btn-register {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--blue);
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.register-user-message {
+    display: none;
+    margin-bottom: 15px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.register-user-message.visible {
+    display: block;
+}
+
+.register-user-message.error {
+    color: #b91c1c;
+}
+
+.register-user-message.success {
+    color: #047857;
+}
+
 #register-user-modal {
     z-index: 110;
 }
@@ -696,35 +727,4 @@ button:disabled {
 
 .issue-form-modal .modal-content {
     width: min(520px, 100%);
-}
-
-.barcode-scanner-card {
-    width: min(520px, 100%);
-}
-
-#barcode-video {
-    display: block;
-    width: 100%;
-    min-height: 220px;
-    margin-bottom: 12px;
-    border-radius: 8px;
-    background: #0f172a;
-    object-fit: cover;
-}
-
-.barcode-status {
-    min-height: 42px;
-    margin-bottom: 12px;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-#stop-barcode-scanner {
-    width: 100%;
-    padding: 11px;
-    border: 0;
-    border-radius: 6px;
-    color: #134e4a;
-    background: #ccfbf1;
-    font-weight: 600;
 }
