@@ -94,17 +94,7 @@
         <header>
             <h1 id="page-title">Facilities Management</h1>
 
-            <div class="header-actions">
-                <div class="signed-in-user" aria-live="polite">
-                    <span class="signed-in-label">Signed in as</span>
-                    <strong id="signed-in-account">—</strong>
-                </div>
-                <div class="active-users" tabindex="0" role="button" aria-expanded="false" aria-live="polite">
-                    <span class="active-users-label">Active now</span>
-                    <strong id="active-users-count">0</strong>
-                    <span id="active-users-status" class="active-users-status" title="Realtime connection status"></span>
-                    <div id="active-users-list" class="active-users-list"></div>
-                </div>
+            <div>
                 <span id="current-date" class="header-date"></span>
                 <button class="btn-action btn-success" id="download-report">
                     Download All Excel Data
@@ -613,6 +603,8 @@
                         <option>Operational</option>
                         <option>Attention Needed</option>
                         <option>Out of Service</option>
+                        <option>Depreciated</option>
+                        <option>Disposed/Defective</option>
                     </select>
                 </div>
 
@@ -643,10 +635,14 @@
     
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script>
+<script>
+    // Replace these values with your Supabase project settings.
+    const SUPABASE_URL = "https://xoysdiavwxfuqygzonjt.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d";
+
     window.supabaseClient = window.supabase.createClient(
-        "https://xoysdiavwxfuqygzonjt.supabase.co",
-        "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d"
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
     );
 </script>
 <script>
