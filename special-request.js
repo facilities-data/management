@@ -1,5 +1,5 @@
 (() => {
-    const supabaseClient = window.supabaseClient;
+    const supabase = window.supabaseClient;
     const TABLE_NAME = "special_requests";
     let requests = [];
     let reminderLoadStarted = false;
@@ -15,30 +15,29 @@
     const createId = () => crypto.randomUUID();
 
     async function getCurrentUser() {
-        const {
-            data: { user }
-        } = await supabaseClient.auth.getUser();
-
-        return user;
+        const { data } = await supabase.auth.getUser();
+        return data.user;
     }
 
     async function loadRequests() {
-        const { data, error } = await supabaseClient
-            .from(TABLE_NAME)
-            .select("*")
-            .order("created_at", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from(TABLE_NAME)
+                .select("*")
+                .order("created_at", { ascending: false });
 
-        if (error) {
+            if (error) {
+                throw error;
+            }
+
+            requests = data || [];
+        } catch (error) {
             console.error("Unable to load special requests:", error);
-            alert(
-                "Unable to load special requests. Check the special_requests table and Supabase policies."
-            );
+            alert("Unable to load special requests from Supabase.");
             requests = [];
             renderRequests();
             return false;
         }
-
-        requests = data || [];
         renderRequests();
         return true;
     }
@@ -77,18 +76,17 @@
             updated_at: new Date().toISOString()
         };
 
-        const result = existingId
-            ? await supabaseClient
+        try {
+            const { error } = await supabase
                 .from(TABLE_NAME)
-                .update(record)
-                .eq("id", existingId)
-            : await supabaseClient
-                .from(TABLE_NAME)
-                .insert(record);
+                .upsert(record, { onConflict: "id" });
 
-        if (result.error) {
-            console.error("Unable to save special request:", result.error);
-            alert(result.error.message);
+            if (error) {
+                throw error;
+            }
+        } catch (error) {
+            console.error("Unable to save special request:", error);
+            alert(error.message || "Unable to save the special request.");
             return false;
         }
 
@@ -108,14 +106,18 @@
             return;
         }
 
-        const { error } = await supabaseClient
-            .from(TABLE_NAME)
-            .delete()
-            .eq("id", id);
+        try {
+            const { error } = await supabase
+                .from(TABLE_NAME)
+                .delete()
+                .eq("id", id);
 
-        if (error) {
+            if (error) {
+                throw error;
+            }
+        } catch (error) {
             console.error("Unable to delete special request:", error);
-            alert(error.message);
+            alert(error.message || "Unable to delete the special request.");
             return;
         }
 
@@ -480,15 +482,11 @@
     }
 
     function subscribeToSpecialRequestChanges() {
-        supabaseClient
+        supabase
             .channel("special-request-changes")
             .on(
                 "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: TABLE_NAME
-                },
+                { event: "*", schema: "public", table: TABLE_NAME },
                 async () => {
                     await loadRequests();
                 }
@@ -627,20 +625,16 @@
         createSpecialRequestInterface();
         initializeAssetBarcodeScanner();
 
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (
-                session &&
-                (event === "SIGNED_IN" || event === "INITIAL_SESSION")
-            ) {
-                setTimeout(initializeSpecialRequestReminder, 1000);
-            }
-
-            if (event === "SIGNED_OUT") {
+        supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setTimeout(() => {
+                    initializeSpecialRequestReminder();
+                    subscribeToSpecialRequestChanges();
+                }, 1000);
+            } else {
                 reminderLoadStarted = false;
                 requests = [];
             }
         });
-
-        // subscribeToSpecialRequestChanges();
     });
 })();
