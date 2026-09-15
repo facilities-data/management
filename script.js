@@ -1,3 +1,5 @@
+const supabaseClient = window.supabaseClient;
+
 const TABLES = {
     orders: "work_orders",
     assets: "assets",
@@ -17,47 +19,6 @@ const cache = {
 let passwordResolver = null;
 
 const getElement = id => document.getElementById(id);
-
-function playNotificationSound(type = "success") {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-
-    if (!AudioContext) {
-        return;
-    }
-
-    try {
-        const context = new AudioContext();
-        const tones = {
-            reminder: [440, 660],
-            save: [660, 880],
-            delete: [520, 360],
-            success: [660, 880]
-        };
-        const frequencies = tones[type] || tones.success;
-        const start = context.currentTime;
-
-        frequencies.forEach((frequency, index) => {
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            const toneStart = start + index * 0.12;
-
-            oscillator.type = "sine";
-            oscillator.frequency.value = frequency;
-            gain.gain.setValueAtTime(0.0001, toneStart);
-            gain.gain.exponentialRampToValueAtTime(0.12, toneStart + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.18);
-
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.start(toneStart);
-            oscillator.stop(toneStart + 0.2);
-        });
-
-        setTimeout(() => context.close(), 600);
-    } catch (error) {
-        console.warn("Notification sound unavailable:", error);
-    }
-}
 
 function getToday() {
     return new Date().toISOString().slice(0, 10);
@@ -106,8 +67,11 @@ function getStatusBadge(status) {
 }
 
 async function getCurrentUser() {
-    const { data } = await window.supabaseClient.auth.getUser();
-    return data.user;
+    const {
+        data: { user }
+    } = await supabaseClient.auth.getUser();
+
+    return user;
 }
 
 async function requireLogin() {
@@ -122,24 +86,20 @@ async function requireLogin() {
 }
 
 async function loadTable(key) {
-    try {
-        const { data, error } = await window.supabaseClient
-            .from(TABLES[key])
-            .select("*")
-            .order("created_at", { ascending: false });
+    const { data, error } = await supabaseClient
+        .from(TABLES[key])
+        .select("*")
+        .order("created_at", { ascending: false });
 
-        if (error) {
-            throw error;
-        }
-
-        cache[key] = data || [];
-        return cache[key];
-    } catch (error) {
+    if (error) {
         console.error(`Unable to load ${key}:`, error);
-        alert(`Unable to load ${key} from Supabase.`);
+        alert(`Unable to load ${key}. Check your Supabase table and policies.`);
         cache[key] = [];
         return [];
     }
+
+    cache[key] = data || [];
+    return cache[key];
 }
 
 async function loadAllData() {
@@ -161,21 +121,24 @@ async function saveRecord(key, record, originalId = "", reload = true) {
         updated_at: new Date().toISOString()
     };
 
-    try {
-        const { error } = await window.supabaseClient
-            .from(TABLES[key])
-            .upsert(recordToSave, { onConflict: "id" });
+    let result;
 
-        if (error) {
-            throw error;
-        }
-    } catch (error) {
-        console.error(error);
-        alert(error.message || "Unable to save the record.");
-        return false;
+    if (originalId) {
+        result = await supabaseClient
+            .from(TABLES[key])
+            .update(recordToSave)
+            .eq("id", originalId);
+    } else {
+        result = await supabaseClient
+            .from(TABLES[key])
+            .insert(recordToSave);
     }
 
-    playNotificationSound("save");
+    if (result.error) {
+        console.error(result.error);
+        alert(result.error.message);
+        return false;
+    }
 
     if (reload) {
         await loadTable(key);
@@ -191,22 +154,17 @@ async function deleteRecord(key, id) {
         return false;
     }
 
-    try {
-        const { error } = await window.supabaseClient
-            .from(TABLES[key])
-            .delete()
-            .eq("id", id);
+    const { error } = await supabaseClient
+        .from(TABLES[key])
+        .delete()
+        .eq("id", id);
 
-        if (error) {
-            throw error;
-        }
-    } catch (error) {
+    if (error) {
         console.error(error);
-        alert(error.message || "Unable to delete the record.");
+        alert(error.message);
         return false;
     }
 
-    playNotificationSound("delete");
     await loadTable(key);
     return true;
 }
@@ -280,13 +238,7 @@ function confirmAdminPassword(event) {
     closeModal("admin-password-modal");
 
     if (resolve) {
-        const authorized = Boolean(getElement("admin-password").value);
-
-        if (authorized) {
-            playNotificationSound("delete");
-        }
-
-        resolve(authorized);
+        resolve(Boolean(getElement("admin-password").value));
     }
 }
 
@@ -435,31 +387,62 @@ function setupNavigation() {
     });
 }
 
+async function handleRegisterUser(event) {
+    event.preventDefault();
+
+    const email = getElement("register-email").value.trim();
+    const password = getElement("register-password").value;
+    const confirmPassword = getElement("register-confirm-password").value;
+    const message = getElement("register-user-message");
+
+    message.className = "register-user-message";
+    message.textContent = "";
+
+    if (password !== confirmPassword) {
+        message.textContent = "Passwords do not match.";
+        message.classList.add("visible", "error");
+        return;
+    }
+
+    const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password
+    });
+
+    if (error) {
+        message.textContent = error.message;
+        message.classList.add("visible", "error");
+        return;
+    }
+
+    getElement("register-user-form").reset();
+    message.textContent = data.session
+        ? "User registered successfully. You can now log in."
+        : "Registration successful. Check your email to confirm your account, then log in.";
+    message.classList.add("visible", "success");
+}
+
 async function handleLogin(event) {
     event.preventDefault();
 
     const email = getElement("login-username").value.trim();
     const password = getElement("login-password").value;
 
-    try {
-        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-            email,
-            password
-        });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+    });
 
-        if (error) {
-            throw error;
-        }
-
-        sessionStorage.setItem("fms_logged_in", "true");
-        sessionStorage.setItem("fms_current_user", data.user.email || email);
-    } catch (error) {
+    if (error || !data.user) {
         getElement("login-error").textContent =
-            error.message || "Invalid email or password.";
+            error?.message || "Invalid email or password.";
         getElement("login-error").classList.add("visible");
         getElement("login-password").select();
         return;
     }
+
+    sessionStorage.setItem("fms_logged_in", "true");
+    sessionStorage.setItem("fms_current_user", data.user.email || email);
     sessionStorage.setItem("fms_current_role", "Administrator");
 
     showApplication();
@@ -467,7 +450,7 @@ async function handleLogin(event) {
 }
 
 async function logout() {
-    await window.supabaseClient.auth.signOut();
+    await supabaseClient.auth.signOut();
 
     sessionStorage.clear();
 
@@ -475,7 +458,8 @@ async function logout() {
     getElement("login-username").value = "";
     getElement("login-password").value = "";
     getElement("login-error")?.classList.remove("visible");
-    
+
+
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
     document.querySelector(".sidebar").style.display = "none";
@@ -1187,7 +1171,6 @@ function showReminder() {
         .join("");
 
     openModal("reminder-modal");
-    playNotificationSound("reminder");
 }
 
 async function renderAll() {
@@ -1255,6 +1238,13 @@ function downloadReport(title, rows, fileName) {
 
 function setupEventHandlers() {
     getElement("login-form").onsubmit = handleLogin;
+    getElement("register-user-form").onsubmit = handleRegisterUser;
+    getElement("open-register-user").onclick = () => {
+        getElement("register-user-message").className = "register-user-message";
+        getElement("register-user-message").textContent = "";
+        openModal("register-user-modal");
+        getElement("register-email")?.focus();
+    };
     getElement("facility-form").onsubmit = addOrder;
     getElement("project-form").onsubmit = saveProject;
     getElement("pms-form").onsubmit = savePms;
@@ -1312,11 +1302,15 @@ function setupEventHandlers() {
 
 function subscribeToChanges() {
     Object.values(TABLES).forEach(table => {
-        window.supabaseClient
-            .channel(`changes-${table}`)
+        supabaseClient
+            .channel(`${table}-changes`)
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table },
+                {
+                    event: "*",
+                    schema: "public",
+                    table
+                },
                 async () => {
                     await renderAll();
                 }
@@ -1332,9 +1326,6 @@ async function initializeData() {
     setupEventHandlers();
 
     await renderAll();
-
-    subscribeToChanges();
-
     showReminder();
 
     setTimeout(() => {
@@ -1351,22 +1342,50 @@ async function initializeData() {
     }, 100);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     getElement("login-form").onsubmit = handleLogin;
+    getElement("register-user-form").onsubmit = handleRegisterUser;
 
-    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-        const user = session?.user;
+    getElement("open-register-user").onclick = () => {
+        const message = getElement("register-user-message");
+        message.className = "register-user-message";
+        message.textContent = "";
+        openModal("register-user-modal");
+        getElement("register-email")?.focus();
+    };
 
-        if (user) {
-            sessionStorage.setItem("fms_logged_in", "true");
-            sessionStorage.setItem("fms_current_user", user.email || "");
-            sessionStorage.setItem("fms_current_role", "Administrator");
-            showApplication();
-            await initializeData();
-        } else {
+    document.querySelectorAll("[data-close]").forEach(button => {
+        button.onclick = () => closeModal(button.dataset.close);
+    });
+
+    const { 
+        data: { session }
+    } = await supabaseClient.auth.getSession();
+
+    if (session) {
+        sessionStorage.setItem("fms_logged_in", "true");
+        sessionStorage.setItem(
+            "fms_current_user",
+            session.user.email || ""
+        );
+
+        sessionStorage.setItem("fms_current_role", "Administrator");
+
+        showApplication();
+        await initializeData();
+    } else {
+        document.querySelector(".sidebar").style.display = "none";
+        document.querySelector(".main-content").style.display = "none";
+    }
+ supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
+        if (event === "SIGNED_OUT" || !sessionState) {
             document.querySelector(".sidebar").style.display = "none";
             document.querySelector(".main-content").style.display = "none";
             getElement("login-screen")?.classList.remove("hidden");
+            return;
         }
-    });
+    // Leave this disabled while WebSocket is unavailable.
+    // subscribeToChanges();
+});
+
 });
