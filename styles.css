@@ -93,6 +93,77 @@ header {
     border-bottom: 2px solid var(--line);
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.signed-in-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--nav);
+    background: #ecfeff;
+    font-size: 13px;
+}
+
+.signed-in-label {
+    color: var(--muted);
+}
+
+.active-users {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--nav);
+    background: #ecfeff;
+    font-size: 13px;
+}
+
+.active-users-label {
+    color: var(--muted);
+}
+
+.active-users-list {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    right: 0;
+    display: none;
+    min-width: 220px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: #134e4a;
+    background: #fff;
+    box-shadow: 0 8px 20px #0002;
+}
+
+.active-users:hover .active-users-list,
+.active-users:focus-within .active-users-list {
+    display: block;
+}
+
+.active-user {
+    padding: 6px 4px;
+    border-bottom: 1px solid #ccfbf1;
+    font-size: 13px;
+}
+
+.active-user:last-child {
+    border-bottom: 0;
+}
+
 header h1 {
     color: var(--nav);
     font-size: 26px;
@@ -605,37 +676,6 @@ button:disabled {
     display: block;
 }
 
-.btn-register {
-    width: 100%;
-    margin-top: 12px;
-    padding: 10px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    color: var(--blue);
-    background: #fff;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.register-user-message {
-    display: none;
-    margin-bottom: 15px;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-.register-user-message.visible {
-    display: block;
-}
-
-.register-user-message.error {
-    color: #b91c1c;
-}
-
-.register-user-message.success {
-    color: #047857;
-}
-
 #register-user-modal {
     z-index: 110;
 }
@@ -661,6 +701,11 @@ button:disabled {
 
     header {
         display: block;
+    }
+
+    .header-actions {
+        justify-content: flex-start;
+        margin-top: 8px;
     }
 
     .header-date {
