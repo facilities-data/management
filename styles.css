@@ -773,3 +773,45 @@ button:disabled {
 .issue-form-modal .modal-content {
     width: min(520px, 100%);
 }
+
+.input-with-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-with-action input {
+    min-width: 0;
+    flex: 1;
+}
+
+.barcode-scanner-content {
+    width: min(600px, 100%);
+}
+
+#barcode-video {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    border-radius: 8px;
+    background: #0f172a;
+    object-fit: cover;
+}
+
+.scanner-help {
+    margin-bottom: 12px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+@media (max-width: 480px) {
+    .input-with-action {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .input-with-action .btn-action {
+        width: 100%;
+        padding: 11px;
+    }
+}
