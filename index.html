@@ -615,7 +615,8 @@
 
                 <div class="form-group">
                     <label for="asset-tag">Asset Tag / Barcode</label>
-                    <input id="asset-tag" required placeholder="Scan or enter asset tag">
+                    <input id="asset-tag" required readonly aria-describedby="asset-tag-help">
+                    <small id="asset-tag-help">Generated automatically when registering a new asset.</small>
                 </div>
 
                 <div class="form-group">
