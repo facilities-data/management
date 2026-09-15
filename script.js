@@ -1,5 +1,3 @@
-const supabaseClient = window.supabaseClient;
-
 const TABLES = {
     orders: "work_orders",
     assets: "assets",
@@ -17,8 +15,6 @@ const cache = {
 };
 
 let passwordResolver = null;
-let presenceChannel = null;
-let interfaceInitialized = false;
 
 const getElement = id => document.getElementById(id);
 
@@ -110,11 +106,8 @@ function getStatusBadge(status) {
 }
 
 async function getCurrentUser() {
-    const {
-        data: { user }
-    } = await supabaseClient.auth.getUser();
-
-    return user;
+    const { data } = await window.supabaseClient.auth.getUser();
+    return data.user;
 }
 
 async function requireLogin() {
@@ -129,20 +122,24 @@ async function requireLogin() {
 }
 
 async function loadTable(key) {
-    const { data, error } = await supabaseClient
-        .from(TABLES[key])
-        .select("*")
-        .order("created_at", { ascending: false });
+    try {
+        const { data, error } = await window.supabaseClient
+            .from(TABLES[key])
+            .select("*")
+            .order("created_at", { ascending: false });
 
-    if (error) {
+        if (error) {
+            throw error;
+        }
+
+        cache[key] = data || [];
+        return cache[key];
+    } catch (error) {
         console.error(`Unable to load ${key}:`, error);
-        alert(`Unable to load ${key}. Check your Supabase table and policies.`);
+        alert(`Unable to load ${key} from Supabase.`);
         cache[key] = [];
         return [];
     }
-
-    cache[key] = data || [];
-    return cache[key];
 }
 
 async function loadAllData() {
@@ -164,22 +161,17 @@ async function saveRecord(key, record, originalId = "", reload = true) {
         updated_at: new Date().toISOString()
     };
 
-    let result;
-
-    if (originalId) {
-        result = await supabaseClient
+    try {
+        const { error } = await window.supabaseClient
             .from(TABLES[key])
-            .update(recordToSave)
-            .eq("id", originalId);
-    } else {
-        result = await supabaseClient
-            .from(TABLES[key])
-            .insert(recordToSave);
-    }
+            .upsert(recordToSave, { onConflict: "id" });
 
-    if (result.error) {
-        console.error(result.error);
-        alert(result.error.message);
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error(error);
+        alert(error.message || "Unable to save the record.");
         return false;
     }
 
@@ -199,14 +191,18 @@ async function deleteRecord(key, id) {
         return false;
     }
 
-    const { error } = await supabaseClient
-        .from(TABLES[key])
-        .delete()
-        .eq("id", id);
+    try {
+        const { error } = await window.supabaseClient
+            .from(TABLES[key])
+            .delete()
+            .eq("id", id);
 
-    if (error) {
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
         console.error(error);
-        alert(error.message);
+        alert(error.message || "Unable to delete the record.");
         return false;
     }
 
@@ -445,209 +441,51 @@ async function handleLogin(event) {
     const email = getElement("login-username").value.trim();
     const password = getElement("login-password").value;
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-    });
+    try {
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
 
-    if (error || !data.user) {
+        if (error) {
+            throw error;
+        }
+
+        sessionStorage.setItem("fms_logged_in", "true");
+        sessionStorage.setItem("fms_current_user", data.user.email || email);
+    } catch (error) {
         getElement("login-error").textContent =
-            error?.message || "Invalid email or password.";
+            error.message || "Invalid email or password.";
         getElement("login-error").classList.add("visible");
         getElement("login-password").select();
         return;
     }
-
-    sessionStorage.setItem("fms_logged_in", "true");
-    sessionStorage.setItem("fms_current_user", data.user.email || email);
     sessionStorage.setItem("fms_current_role", "Administrator");
 
-    showApplication(data.user);
-
-    // Do not block the dashboard while Realtime or table data connects.
-    startPresence(data.user).catch(error => {
-        console.error("Unable to start active-user presence:", error);
-    });
-
-    initializeData().catch(error => {
-        console.error("Unable to initialize dashboard data:", error);
-    });
+    showApplication();
+    await initializeData();
 }
 
 async function logout() {
-    // Update the UI immediately; realtime cleanup should never block logout.
+    await window.supabaseClient.auth.signOut();
+
     sessionStorage.clear();
 
     getElement("login-form")?.reset();
     getElement("login-username").value = "";
     getElement("login-password").value = "";
     getElement("login-error")?.classList.remove("visible");
-    updateSignedInAccount(null);
-    renderActiveUsers([]);
-    setPresenceStatus("disconnected");
-
+    
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
     document.querySelector(".sidebar").style.display = "none";
     document.querySelector(".main-content").style.display = "none";
 
     getElement("login-username")?.focus();
-
-    // Clean up the channel and sign out in the background with a short timeout.
-    const cleanup = Promise.allSettled([
-        stopPresence(),
-        supabaseClient.auth.signOut()
-    ]);
-
-    await Promise.race([
-        cleanup,
-        new Promise(resolve => setTimeout(resolve, 1500))
-    ]);
 }
 
-function updateSignedInAccount(user) {
-    const account = getElement("signed-in-account");
-
-    if (account) {
-        account.textContent = user?.email || "—";
-    }
-}
-
-function setupActiveUsersToggle() {
-    const activeUsers = document.querySelector(".active-users");
-
-    if (!activeUsers || activeUsers.dataset.toggleReady) {
-        return;
-    }
-
-    activeUsers.dataset.toggleReady = "true";
-
-    const toggle = event => {
-        if (event.type === "keydown" && !["Enter", " "].includes(event.key)) {
-            return;
-        }
-
-        event.preventDefault();
-        const isOpen = activeUsers.classList.toggle("is-open");
-        activeUsers.setAttribute("aria-expanded", String(isOpen));
-    };
-
-    activeUsers.addEventListener("click", toggle);
-    activeUsers.addEventListener("keydown", toggle);
-}
-
-function setPresenceStatus(status) {
-    const indicator = getElement("active-users-status");
-
-    if (!indicator) {
-        return;
-    }
-
-    indicator.classList.remove("connected", "error");
-    indicator.classList.toggle("connected", status === "connected");
-    indicator.classList.toggle("error", ["error", "timed_out"].includes(status));
-    indicator.title = `Active-user connection: ${status}`;
-}
-
-function renderActiveUsers(users = []) {
-    const count = getElement("active-users-count");
-    const list = getElement("active-users-list");
-
-    if (!count || !list) {
-        return;
-    }
-
-    const uniqueUsers = [...new Map(
-        users
-            .filter(user => user?.email)
-            .map(user => [user.id || user.email, user])
-    ).values()].sort((a, b) => a.email.localeCompare(b.email));
-
-    count.textContent = uniqueUsers.length;
-    list.setAttribute("aria-label", `${uniqueUsers.length} active user${uniqueUsers.length === 1 ? "" : "s"}`);
-    list.innerHTML = uniqueUsers.length
-        ? uniqueUsers.map(user => `
-            <div class="active-user">● ${escapeHtml(user.email)}</div>
-        `).join("")
-        : "<div class=\"active-user\">No active users</div>";
-}
-
-async function startPresence(user) {
-    if (!user) {
-        return;
-    }
-
-    if (presenceChannel) {
-        await stopPresence();
-    }
-
-    const presenceUser = {
-        id: user.id,
-        email: user.email || "Unknown account"
-    };
-
-    renderActiveUsers([presenceUser]);
-    setPresenceStatus("connecting");
-
-    presenceChannel = supabaseClient.channel("fms-active-users", {
-        config: {
-            presence: {
-                key: user.id
-            }
-        }
-    });
-
-    const updateUsers = () => {
-        const state = presenceChannel.presenceState();
-        const users = Object.values(state).flat();
-        renderActiveUsers(users.length ? users : [presenceUser]);
-    };
-
-    presenceChannel
-        .on("presence", { event: "sync" }, updateUsers)
-        .on("presence", { event: "join" }, updateUsers)
-        .on("presence", { event: "leave" }, updateUsers);
-
-    presenceChannel.subscribe(async status => {
-        if (status === "SUBSCRIBED") {
-            const { error } = await presenceChannel.track(presenceUser);
-
-            if (error) {
-                setPresenceStatus("error");
-                console.error("Unable to publish active-user presence:", error);
-                return;
-            }
-
-            setPresenceStatus("connected");
-            updateUsers();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            setPresenceStatus(status === "TIMED_OUT" ? "timed_out" : "error");
-            console.error(`Active-user presence connection status: ${status}`);
-        }
-    });
-}
-
-async function stopPresence() {
-    if (!presenceChannel) {
-        return;
-    }
-
-    await presenceChannel.untrack();
-    await supabaseClient.removeChannel(presenceChannel);
-    presenceChannel = null;
-    renderActiveUsers([]);
-    setPresenceStatus("disconnected");
-}
-
-function showApplication(user = null) {
-    const loginScreen = getElement("login-screen");
-
-    if (loginScreen) {
-        loginScreen.classList.add("hidden");
-        loginScreen.style.display = "none";
-    }
-
-    updateSignedInAccount(user);
+function showApplication() {
+    getElement("login-screen")?.classList.add("hidden");
 
     const sidebar = document.querySelector(".sidebar");
     const main = document.querySelector(".main-content");
@@ -1474,15 +1312,11 @@ function setupEventHandlers() {
 
 function subscribeToChanges() {
     Object.values(TABLES).forEach(table => {
-        supabaseClient
-            .channel(`${table}-changes`)
+        window.supabaseClient
+            .channel(`changes-${table}`)
             .on(
                 "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table
-                },
+                { event: "*", schema: "public", table },
                 async () => {
                     await renderAll();
                 }
@@ -1493,82 +1327,46 @@ function subscribeToChanges() {
 
 async function initializeData() {
     setupFacilitiesSubmenuViews();
-
-    if (!interfaceInitialized) {
-        setupNavigation();
-        createWorkOrderEditModal();
-        setupEventHandlers();
-        interfaceInitialized = true;
-    }
-
-    const date = getElement("current-date");
-
-    if (date) {
-        date.textContent = new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric"
-        });
-    }
+    setupNavigation();
+    createWorkOrderEditModal();
+    setupEventHandlers();
 
     await renderAll();
+
+    subscribeToChanges();
+
     showReminder();
+
+    setTimeout(() => {
+        const date = getElement("current-date");
+
+        if (date) {
+            date.textContent = new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+            });
+        }
+    }, 100);
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
     getElement("login-form").onsubmit = handleLogin;
-    setupActiveUsersToggle();
 
-    const {
-        data: { session }
-    } = await supabaseClient.auth.getSession();
+    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+        const user = session?.user;
 
-    if (session) {
-        sessionStorage.setItem("fms_logged_in", "true");
-        sessionStorage.setItem(
-            "fms_current_user",
-            session.user.email || ""
-        );
-
-        sessionStorage.setItem("fms_current_role", "Administrator");
-
-        showApplication(session.user);
-
-        // Show the dashboard immediately; load presence and data in the background.
-        startPresence(session.user).catch(error => {
-            console.error("Unable to start active-user presence:", error);
-        });
-
-        initializeData().catch(error => {
-            console.error("Unable to initialize dashboard data:", error);
-        });
-    } else {
-        document.querySelector(".sidebar").style.display = "none";
-        document.querySelector(".main-content").style.display = "none";
-    }
-     supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
-        if (event === "SIGNED_OUT" || !sessionState) {
-            await stopPresence();
+        if (user) {
+            sessionStorage.setItem("fms_logged_in", "true");
+            sessionStorage.setItem("fms_current_user", user.email || "");
+            sessionStorage.setItem("fms_current_role", "Administrator");
+            showApplication();
+            await initializeData();
+        } else {
             document.querySelector(".sidebar").style.display = "none";
             document.querySelector(".main-content").style.display = "none";
             getElement("login-screen")?.classList.remove("hidden");
-            updateSignedInAccount(null);
-            return;
         }
-
-        if (event === "SIGNED_IN" && sessionState.user) {
-            showApplication(sessionState.user);
-            startPresence(sessionState.user).catch(error => {
-                console.error("Unable to start active-user presence:", error);
-            });
-            initializeData().catch(error => {
-                console.error("Unable to initialize dashboard data:", error);
-            });
-        }
-
-        // Leave this disabled while WebSocket is unavailable.
-        // subscribeToChanges();
     });
-
 });
