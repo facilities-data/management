@@ -17,6 +17,7 @@ const cache = {
 };
 
 let passwordResolver = null;
+let presenceChannel = null;
 
 const getElement = id => document.getElementById(id);
 
@@ -460,11 +461,13 @@ async function handleLogin(event) {
     sessionStorage.setItem("fms_current_user", data.user.email || email);
     sessionStorage.setItem("fms_current_role", "Administrator");
 
-    showApplication();
-    await initializeData();
+            showApplication(data.user);
+        await startPresence(data.user);
+        await initializeData();
 }
 
 async function logout() {
+    await stopPresence();
     await supabaseClient.auth.signOut();
 
     sessionStorage.clear();
@@ -473,6 +476,7 @@ async function logout() {
     getElement("login-username").value = "";
     getElement("login-password").value = "";
     getElement("login-error")?.classList.remove("visible");
+    updateSignedInAccount(null);
     
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
@@ -482,8 +486,85 @@ async function logout() {
     getElement("login-username")?.focus();
 }
 
-function showApplication() {
+function updateSignedInAccount(user) {
+    const account = getElement("signed-in-account");
+
+    if (account) {
+        account.textContent = user?.email || "—";
+    }
+}
+
+function renderActiveUsers(users = []) {
+    const count = getElement("active-users-count");
+    const list = getElement("active-users-list");
+
+    if (!count || !list) {
+        return;
+    }
+
+    const uniqueUsers = [...new Map(
+        users
+            .filter(user => user?.email)
+            .map(user => [user.id || user.email, user])
+    ).values()].sort((a, b) => a.email.localeCompare(b.email));
+
+    count.textContent = uniqueUsers.length;
+    list.innerHTML = uniqueUsers.length
+        ? uniqueUsers.map(user => `
+            <div class="active-user">● ${escapeHtml(user.email)}</div>
+        `).join("")
+        : "<div class=\"active-user\">No active users</div>";
+}
+
+async function startPresence(user) {
+    if (!user || presenceChannel) {
+        return;
+    }
+
+    presenceChannel = supabaseClient.channel("fms-active-users", {
+        config: { presence: { key: user.id } }
+    });
+
+    const updateUsers = () => {
+        const state = presenceChannel.presenceState();
+        const users = Object.values(state).flat();
+        renderActiveUsers(users);
+    };
+
+    presenceChannel
+        .on("presence", { event: "sync" }, updateUsers)
+        .on("presence", { event: "join" }, updateUsers)
+        .on("presence", { event: "leave" }, updateUsers);
+
+    presenceChannel.subscribe(async status => {
+        if (status === "SUBSCRIBED") {
+            const { error } = await presenceChannel.track({
+                id: user.id,
+                email: user.email || "Unknown account"
+            });
+
+            if (error) {
+                console.error("Unable to publish active-user presence:", error);
+            }
+        }
+    });
+}
+
+async function stopPresence() {
+    if (!presenceChannel) {
+        return;
+    }
+
+    await presenceChannel.untrack();
+    await supabaseClient.removeChannel(presenceChannel);
+    presenceChannel = null;
+    renderActiveUsers([]);
+}
+
+function showApplication(user = null) {
     getElement("login-screen")?.classList.add("hidden");
+    updateSignedInAccount(user);
+
 
     const sidebar = document.querySelector(".sidebar");
     const main = document.querySelector(".main-content");
@@ -1334,9 +1415,6 @@ async function initializeData() {
     setupEventHandlers();
 
     await renderAll();
-
-    subscribeToChanges();
-
     showReminder();
 
     setTimeout(() => {
@@ -1369,7 +1447,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         sessionStorage.setItem("fms_current_role", "Administrator");
 
-        showApplication();
+        showApplication(session.user);
+        await startPresence(session.user);
         await initializeData();
     } else {
         document.querySelector(".sidebar").style.display = "none";
@@ -1377,12 +1456,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
  supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
         if (event === "SIGNED_OUT" || !sessionState) {
+            await stopPresence();
             document.querySelector(".sidebar").style.display = "none";
             document.querySelector(".main-content").style.display = "none";
             getElement("login-screen")?.classList.remove("hidden");
+            updateSignedInAccount(null);
             return;
         }
-    
+    // Leave this disabled while WebSocket is unavailable.
+    // subscribeToChanges();
 });
 
 });
