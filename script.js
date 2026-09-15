@@ -640,9 +640,14 @@ async function stopPresence() {
 }
 
 function showApplication(user = null) {
-    getElement("login-screen")?.classList.add("hidden");
-    updateSignedInAccount(user);
+    const loginScreen = getElement("login-screen");
 
+    if (loginScreen) {
+        loginScreen.classList.add("hidden");
+        loginScreen.style.display = "none";
+    }
+
+    updateSignedInAccount(user);
 
     const sidebar = document.querySelector(".sidebar");
     const main = document.querySelector(".main-content");
