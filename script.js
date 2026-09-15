@@ -18,6 +18,9 @@ const cache = {
 
 let passwordResolver = null;
 let presenceChannel = null;
+let realtimeChannels = [];
+let realtimeRefreshTimer = null;
+let realtimeRefreshInProgress = false;
 let barcodeStream = null;
 let barcodeDetector = null;
 let barcodeScanFrame = null;
@@ -264,7 +267,8 @@ function createProjectId() {
 }
 
 function createAssetTag() {
-    return createId("ARCPH", cache.assets, 5, 50000);
+    // Asset tags use six digits and begin at ARCPH500001.
+    return createId("ARCPH", cache.assets, 6, 500000);
 }
 
 function createVendorId() {
@@ -490,6 +494,7 @@ async function handleLogin(event) {
 }
 
 async function logout() {
+    await unsubscribeFromChanges();
     await stopPresence();
     await supabaseClient.auth.signOut();
 
@@ -917,7 +922,7 @@ function editAsset(id = "") {
         asset ? "Update Asset" : "Register New Asset";
 
     getElement("asset-id").value = asset?.id || "";
-    getElement("asset-tag").value = asset?.id || "";
+    getElement("asset-tag").value = asset?.id || createAssetTag();
     getElement("asset-name").value = asset?.name || "";
     getElement("asset-location").value = asset?.location || "";
     getElement("asset-status").value = asset?.status || "";
@@ -1511,9 +1516,30 @@ function setupEventHandlers() {
 }
 
 function subscribeToChanges() {
-    Object.values(TABLES).forEach(table => {
-        supabaseClient
-            .channel(`${table}-changes`)
+    if (realtimeChannels.length) {
+        return;
+    }
+
+    const refreshFromRealtime = () => {
+        clearTimeout(realtimeRefreshTimer);
+        realtimeRefreshTimer = setTimeout(async () => {
+            if (realtimeRefreshInProgress) {
+                return;
+            }
+
+            realtimeRefreshInProgress = true;
+
+            try {
+                await renderAll();
+            } finally {
+                realtimeRefreshInProgress = false;
+            }
+        }, 150);
+    };
+
+    Object.entries(TABLES).forEach(([key, table]) => {
+        const channel = supabaseClient
+            .channel(`fms-${key}-changes`)
             .on(
                 "postgres_changes",
                 {
@@ -1521,12 +1547,27 @@ function subscribeToChanges() {
                     schema: "public",
                     table
                 },
-                async () => {
-                    await renderAll();
-                }
+                refreshFromRealtime
             )
-            .subscribe();
+            .subscribe(status => {
+                if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                    console.error(`Realtime subscription failed for ${table}.`);
+                }
+            });
+
+        realtimeChannels.push(channel);
     });
+}
+
+async function unsubscribeFromChanges() {
+    clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = null;
+
+    await Promise.all(
+        realtimeChannels.map(channel => supabaseClient.removeChannel(channel))
+    );
+
+    realtimeChannels = [];
 }
 
 async function initializeData() {
@@ -1536,6 +1577,7 @@ async function initializeData() {
     setupEventHandlers();
 
     await renderAll();
+    subscribeToChanges();
     showReminder();
 
     setTimeout(() => {
@@ -1577,6 +1619,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
  supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
         if (event === "SIGNED_OUT" || !sessionState) {
+            await unsubscribeFromChanges();
             await stopPresence();
             document.querySelector(".sidebar").style.display = "none";
             document.querySelector(".main-content").style.display = "none";
@@ -1584,8 +1627,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateSignedInAccount(null);
             return;
         }
-    // Leave this disabled while WebSocket is unavailable.
-    // subscribeToChanges();
+
+        if (event === "SIGNED_IN" && sessionState) {
+            showApplication(sessionState.user);
+            await startPresence(sessionState.user);
+            await initializeData();
+        }
 });
 
 });
