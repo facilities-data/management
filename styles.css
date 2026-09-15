@@ -135,6 +135,21 @@ header {
     color: var(--muted);
 }
 
+.active-users-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+}
+
+.active-users-status.connected {
+    background: var(--green);
+}
+
+.active-users-status.error {
+    background: var(--red);
+}
+
 .active-users-list {
     position: absolute;
     z-index: 2;
