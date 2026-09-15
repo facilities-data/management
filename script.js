@@ -1496,22 +1496,19 @@ async function initializeData() {
         interfaceInitialized = true;
     }
 
+    const date = getElement("current-date");
+
+    if (date) {
+        date.textContent = new Date().toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+        });
+    }
+
     await renderAll();
     showReminder();
-}
-
-    setTimeout(() => {
-        const date = getElement("current-date");
-
-        if (date) {
-            date.textContent = new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-            });
-        }
-    }, 100);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
