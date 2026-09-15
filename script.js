@@ -517,6 +517,19 @@ function setupActiveUsersToggle() {
     activeUsers.addEventListener("keydown", toggle);
 }
 
+function setPresenceStatus(status) {
+    const indicator = getElement("active-users-status");
+
+    if (!indicator) {
+        return;
+    }
+
+    indicator.classList.remove("connected", "error");
+    indicator.classList.toggle("connected", status === "connected");
+    indicator.classList.toggle("error", ["error", "timed_out"].includes(status));
+    indicator.title = `Active-user connection: ${status}`;
+}
+
 function renderActiveUsers(users = []) {
     const count = getElement("active-users-count");
     const list = getElement("active-users-list");
@@ -554,8 +567,8 @@ async function startPresence(user) {
         email: user.email || "Unknown account"
     };
 
-    // Show this account immediately while Realtime establishes the connection.
     renderActiveUsers([presenceUser]);
+    setPresenceStatus("connecting");
 
     presenceChannel = supabaseClient.channel("fms-active-users", {
         config: {
@@ -581,11 +594,15 @@ async function startPresence(user) {
             const { error } = await presenceChannel.track(presenceUser);
 
             if (error) {
+                setPresenceStatus("error");
                 console.error("Unable to publish active-user presence:", error);
-            } else {
-                updateUsers();
+                return;
             }
+
+            setPresenceStatus("connected");
+            updateUsers();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setPresenceStatus(status === "TIMED_OUT" ? "timed_out" : "error");
             console.error(`Active-user presence connection status: ${status}`);
         }
     });
@@ -600,6 +617,7 @@ async function stopPresence() {
     await supabaseClient.removeChannel(presenceChannel);
     presenceChannel = null;
     renderActiveUsers([]);
+    setPresenceStatus("disconnected");
 }
 
 function showApplication(user = null) {
