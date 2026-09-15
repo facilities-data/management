@@ -1,5 +1,5 @@
 (() => {
-    const supabase = window.supabaseClient;
+    const supabaseClient = window.supabaseClient;
     const TABLE_NAME = "special_requests";
     let requests = [];
     let reminderLoadStarted = false;
@@ -15,29 +15,30 @@
     const createId = () => crypto.randomUUID();
 
     async function getCurrentUser() {
-        const { data } = await supabase.auth.getUser();
-        return data.user;
+        const {
+            data: { user }
+        } = await supabaseClient.auth.getUser();
+
+        return user;
     }
 
     async function loadRequests() {
-        try {
-            const { data, error } = await supabase
-                .from(TABLE_NAME)
-                .select("*")
-                .order("created_at", { ascending: false });
+        const { data, error } = await supabaseClient
+            .from(TABLE_NAME)
+            .select("*")
+            .order("created_at", { ascending: false });
 
-            if (error) {
-                throw error;
-            }
-
-            requests = data || [];
-        } catch (error) {
+        if (error) {
             console.error("Unable to load special requests:", error);
-            alert("Unable to load special requests from Supabase.");
+            alert(
+                "Unable to load special requests. Check the special_requests table and Supabase policies."
+            );
             requests = [];
             renderRequests();
             return false;
         }
+
+        requests = data || [];
         renderRequests();
         return true;
     }
@@ -76,22 +77,19 @@
             updated_at: new Date().toISOString()
         };
 
-        try {
-            const { error } = await supabase
+        const result = existingId
+            ? await supabaseClient
                 .from(TABLE_NAME)
-                .upsert(record, { onConflict: "id" });
+                .update(record)
+                .eq("id", existingId)
+            : await supabaseClient
+                .from(TABLE_NAME)
+                .insert(record);
 
-            if (error) {
-                throw error;
-            }
-        } catch (error) {
-            console.error("Unable to save special request:", error);
-            alert(error.message || "Unable to save the special request.");
+        if (result.error) {
+            console.error("Unable to save special request:", result.error);
+            alert(result.error.message);
             return false;
-        }
-
-        if (typeof playNotificationSound === "function") {
-            playNotificationSound("save");
         }
 
         await loadRequests();
@@ -106,23 +104,15 @@
             return;
         }
 
-        try {
-            const { error } = await supabase
-                .from(TABLE_NAME)
-                .delete()
-                .eq("id", id);
+        const { error } = await supabaseClient
+            .from(TABLE_NAME)
+            .delete()
+            .eq("id", id);
 
-            if (error) {
-                throw error;
-            }
-        } catch (error) {
+        if (error) {
             console.error("Unable to delete special request:", error);
-            alert(error.message || "Unable to delete the special request.");
+            alert(error.message);
             return;
-        }
-
-        if (typeof playNotificationSound === "function") {
-            playNotificationSound("delete");
         }
 
         await loadRequests();
@@ -439,10 +429,6 @@
         document.body.appendChild(reminder);
         reminder.classList.add("open");
 
-        if (typeof playNotificationSound === "function") {
-            playNotificationSound("reminder");
-        }
-
         const closeReminder = () => {
             reminder.classList.remove("open");
 
@@ -482,11 +468,15 @@
     }
 
     function subscribeToSpecialRequestChanges() {
-        supabase
+        supabaseClient
             .channel("special-request-changes")
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: TABLE_NAME },
+                {
+                    event: "*",
+                    schema: "public",
+                    table: TABLE_NAME
+                },
                 async () => {
                     await loadRequests();
                 }
@@ -494,147 +484,23 @@
             .subscribe();
     }
 
-    function initializeAssetBarcodeScanner() {
-        const assetView = getElement("assets-view");
-        const assetToolbar = assetView?.querySelector(".section-heading > div:last-child");
-
-        if (!assetToolbar || getElement("scan-asset-barcode")) {
-            return;
-        }
-
-        const scanButton = document.createElement("button");
-        scanButton.type = "button";
-        scanButton.id = "scan-asset-barcode";
-        scanButton.className = "report-button";
-        scanButton.textContent = "Scan Asset Barcode";
-        assetToolbar.insertBefore(scanButton, assetToolbar.firstChild);
-
-        const modal = document.createElement("div");
-        modal.id = "asset-barcode-modal";
-        modal.className = "modal";
-        modal.innerHTML = `
-            <div class="modal-content barcode-scanner-card">
-                <div class="modal-header">
-                    <h2>Scan Asset Barcode</h2>
-                    <button type="button" class="modal-close" id="close-barcode-scanner">
-                        &times;
-                    </button>
-                </div>
-                <video id="barcode-video" autoplay muted playsinline></video>
-                <p id="barcode-status" class="barcode-status">
-                    Point your phone camera at an asset barcode.
-                </p>
-                <button type="button" class="btn-cancel" id="stop-barcode-scanner">
-                    Cancel
-                </button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        let stream = null;
-        let detector = null;
-        let scanning = false;
-        const video = getElement("barcode-video");
-        const status = getElement("barcode-status");
-
-        const stopScanner = () => {
-            scanning = false;
-            stream?.getTracks().forEach(track => track.stop());
-            stream = null;
-            video.srcObject = null;
-            modal.classList.remove("open");
-        };
-
-        const scanFrame = async () => {
-            if (!scanning || !detector || video.readyState < 2) {
-                if (scanning) {
-                    requestAnimationFrame(scanFrame);
-                }
-                return;
-            }
-
-            try {
-                const results = await detector.detect(video);
-                const barcode = results[0]?.rawValue?.trim();
-
-                if (barcode) {
-                    const asset = cache.assets.find(item =>
-                        String(item.id).trim().toLowerCase() === barcode.toLowerCase()
-                    );
-
-                    if (!asset) {
-                        status.textContent = `No asset found for barcode “${barcode}”.`;
-                        requestAnimationFrame(scanFrame);
-                        return;
-                    }
-
-                    stopScanner();
-                    editAsset(asset.id);
-                    return;
-                }
-            } catch (error) {
-                console.warn("Barcode scan failed:", error);
-            }
-
-            requestAnimationFrame(scanFrame);
-        };
-
-        const startScanner = async () => {
-            if (!("BarcodeDetector" in window)) {
-                status.textContent =
-                    "Barcode scanning is not supported by this browser. Try Chrome on Android or Safari on iPhone.";
-                modal.classList.add("open");
-                return;
-            }
-
-            try {
-                detector = new BarcodeDetector({
-                    formats: [
-                        "code_128", "code_39", "code_93", "codabar",
-                        "ean_13", "ean_8", "upc_a", "upc_e", "itf", "qr_code"
-                    ]
-                });
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: "environment" } },
-                    audio: false
-                });
-                video.srcObject = stream;
-                scanning = true;
-                modal.classList.add("open");
-                await video.play();
-                requestAnimationFrame(scanFrame);
-            } catch (error) {
-                console.error("Unable to access the camera:", error);
-                status.textContent =
-                    "Camera access was denied or unavailable. Allow camera access and try again.";
-                modal.classList.add("open");
-            }
-        };
-
-        scanButton.onclick = startScanner;
-        getElement("close-barcode-scanner").onclick = stopScanner;
-        getElement("stop-barcode-scanner").onclick = stopScanner;
-        modal.onclick = event => {
-            if (event.target === modal) {
-                stopScanner();
-            }
-        };
-    }
-
     document.addEventListener("DOMContentLoaded", () => {
         createSpecialRequestInterface();
-        initializeAssetBarcodeScanner();
 
-        supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                setTimeout(() => {
-                    initializeSpecialRequestReminder();
-                    subscribeToSpecialRequestChanges();
-                }, 1000);
-            } else {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (
+                session &&
+                (event === "SIGNED_IN" || event === "INITIAL_SESSION")
+            ) {
+                setTimeout(initializeSpecialRequestReminder, 1000);
+            }
+
+            if (event === "SIGNED_OUT") {
                 reminderLoadStarted = false;
                 requests = [];
             }
         });
+
+        // subscribeToSpecialRequestChanges();
     });
 })();
