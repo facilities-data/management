@@ -94,7 +94,16 @@
         <header>
             <h1 id="page-title">Facilities Management</h1>
 
-            <div>
+            <div class="header-actions">
+                <div class="signed-in-user" aria-live="polite">
+                    <span class="signed-in-label">Signed in as</span>
+                    <strong id="signed-in-account">—</strong>
+                </div>
+                <div class="active-users" aria-live="polite">
+                    <span class="active-users-label">Active now</span>
+                    <strong id="active-users-count">0</strong>
+                    <div id="active-users-list" class="active-users-list"></div>
+                </div>
                 <span id="current-date" class="header-date"></span>
                 <button class="btn-action btn-success" id="download-report">
                     Download All Excel Data
@@ -603,8 +612,6 @@
                         <option>Operational</option>
                         <option>Attention Needed</option>
                         <option>Out of Service</option>
-                        <option>Depreciated</option>
-                        <option>Disposed/Defective</option>
                     </select>
                 </div>
 
