@@ -467,9 +467,7 @@ async function handleLogin(event) {
 }
 
 async function logout() {
-    await stopPresence();
-    await supabaseClient.auth.signOut();
-
+    // Update the UI immediately; realtime cleanup should never block logout.
     sessionStorage.clear();
 
     getElement("login-form")?.reset();
@@ -477,13 +475,26 @@ async function logout() {
     getElement("login-password").value = "";
     getElement("login-error")?.classList.remove("visible");
     updateSignedInAccount(null);
-    
+    renderActiveUsers([]);
+    setPresenceStatus("disconnected");
+
     getElement("login-screen")?.classList.remove("hidden");
     getElement("login-screen").style.display = "flex";
     document.querySelector(".sidebar").style.display = "none";
     document.querySelector(".main-content").style.display = "none";
 
     getElement("login-username")?.focus();
+
+    // Clean up the channel and sign out in the background with a short timeout.
+    const cleanup = Promise.allSettled([
+        stopPresence(),
+        supabaseClient.auth.signOut()
+    ]);
+
+    await Promise.race([
+        cleanup,
+        new Promise(resolve => setTimeout(resolve, 1500))
+    ]);
 }
 
 function updateSignedInAccount(user) {
