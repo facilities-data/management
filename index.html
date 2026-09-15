@@ -300,6 +300,10 @@
                             + Register New Asset
                         </button>
 
+                        <button type="button" class="btn-action btn-primary" id="scan-asset-barcode">
+                            Scan Barcode
+                        </button>
+
                         <button class="report-button" id="download-assets-report">
                             Download Assets
                         </button>
@@ -583,6 +587,18 @@
         </div>
     </div>
 
+    <div id="barcode-scanner-modal" class="modal">
+        <div class="modal-content barcode-scanner-content">
+            <div class="modal-header">
+                <h2>Scan Asset Barcode</h2>
+                <button type="button" class="modal-close" id="close-barcode-scanner">&times;</button>
+            </div>
+            <p class="scanner-help">Point your phone camera at the barcode. Camera access requires HTTPS and permission.</p>
+            <video id="barcode-video" playsinline autoplay muted></video>
+            <div id="barcode-scan-error" class="password-error"></div>
+        </div>
+    </div>
+
     <div id="asset-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -594,6 +610,11 @@
 
             <form id="asset-form">
                 <input type="hidden" id="asset-id">
+
+                <div class="form-group">
+                    <label for="asset-tag">Asset Tag / Barcode</label>
+                    <input id="asset-tag" required placeholder="Scan or enter asset tag">
+                </div>
 
                 <div class="form-group">
                     <label for="asset-name">Item Name</label>
