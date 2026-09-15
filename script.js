@@ -494,6 +494,29 @@ function updateSignedInAccount(user) {
     }
 }
 
+function setupActiveUsersToggle() {
+    const activeUsers = document.querySelector(".active-users");
+
+    if (!activeUsers || activeUsers.dataset.toggleReady) {
+        return;
+    }
+
+    activeUsers.dataset.toggleReady = "true";
+
+    const toggle = event => {
+        if (event.type === "keydown" && !["Enter", " "].includes(event.key)) {
+            return;
+        }
+
+        event.preventDefault();
+        const isOpen = activeUsers.classList.toggle("is-open");
+        activeUsers.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    activeUsers.addEventListener("click", toggle);
+    activeUsers.addEventListener("keydown", toggle);
+}
+
 function renderActiveUsers(users = []) {
     const count = getElement("active-users-count");
     const list = getElement("active-users-list");
@@ -509,6 +532,7 @@ function renderActiveUsers(users = []) {
     ).values()].sort((a, b) => a.email.localeCompare(b.email));
 
     count.textContent = uniqueUsers.length;
+    list.setAttribute("aria-label", `${uniqueUsers.length} active user${uniqueUsers.length === 1 ? "" : "s"}`);
     list.innerHTML = uniqueUsers.length
         ? uniqueUsers.map(user => `
             <div class="active-user">● ${escapeHtml(user.email)}</div>
@@ -517,18 +541,34 @@ function renderActiveUsers(users = []) {
 }
 
 async function startPresence(user) {
-    if (!user || presenceChannel) {
+    if (!user) {
         return;
     }
 
+    if (presenceChannel) {
+        await stopPresence();
+    }
+
+    const presenceUser = {
+        id: user.id,
+        email: user.email || "Unknown account"
+    };
+
+    // Show this account immediately while Realtime establishes the connection.
+    renderActiveUsers([presenceUser]);
+
     presenceChannel = supabaseClient.channel("fms-active-users", {
-        config: { presence: { key: user.id } }
+        config: {
+            presence: {
+                key: user.id
+            }
+        }
     });
 
     const updateUsers = () => {
         const state = presenceChannel.presenceState();
         const users = Object.values(state).flat();
-        renderActiveUsers(users);
+        renderActiveUsers(users.length ? users : [presenceUser]);
     };
 
     presenceChannel
@@ -538,14 +578,15 @@ async function startPresence(user) {
 
     presenceChannel.subscribe(async status => {
         if (status === "SUBSCRIBED") {
-            const { error } = await presenceChannel.track({
-                id: user.id,
-                email: user.email || "Unknown account"
-            });
+            const { error } = await presenceChannel.track(presenceUser);
 
             if (error) {
                 console.error("Unable to publish active-user presence:", error);
+            } else {
+                updateUsers();
             }
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            console.error(`Active-user presence connection status: ${status}`);
         }
     });
 }
@@ -1433,6 +1474,7 @@ async function initializeData() {
 
 document.addEventListener("DOMContentLoaded", async () => {
     getElement("login-form").onsubmit = handleLogin;
+    setupActiveUsersToggle();
 
     const {
         data: { session }
