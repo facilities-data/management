@@ -128,6 +128,7 @@ header {
     color: var(--nav);
     background: #ecfeff;
     font-size: 13px;
+    cursor: default;
 }
 
 .active-users-label {
@@ -150,7 +151,8 @@ header {
 }
 
 .active-users:hover .active-users-list,
-.active-users:focus-within .active-users-list {
+.active-users:focus-within .active-users-list,
+.active-users.is-open .active-users-list {
     display: block;
 }
 
