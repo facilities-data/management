@@ -461,9 +461,16 @@ async function handleLogin(event) {
     sessionStorage.setItem("fms_current_user", data.user.email || email);
     sessionStorage.setItem("fms_current_role", "Administrator");
 
-            showApplication(data.user);
-        await startPresence(data.user);
-        await initializeData();
+    showApplication(data.user);
+
+    // Do not block the dashboard while Realtime or table data connects.
+    startPresence(data.user).catch(error => {
+        console.error("Unable to start active-user presence:", error);
+    });
+
+    initializeData().catch(error => {
+        console.error("Unable to initialize dashboard data:", error);
+    });
 }
 
 async function logout() {
@@ -1519,8 +1526,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         sessionStorage.setItem("fms_current_role", "Administrator");
 
         showApplication(session.user);
-        await startPresence(session.user);
-        await initializeData();
+
+        // Show the dashboard immediately; load presence and data in the background.
+        startPresence(session.user).catch(error => {
+            console.error("Unable to start active-user presence:", error);
+        });
+
+        initializeData().catch(error => {
+            console.error("Unable to initialize dashboard data:", error);
+        });
     } else {
         document.querySelector(".sidebar").style.display = "none";
         document.querySelector(".main-content").style.display = "none";
