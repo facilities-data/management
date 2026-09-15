@@ -18,6 +18,7 @@ const cache = {
 
 let passwordResolver = null;
 let presenceChannel = null;
+let interfaceInitialized = false;
 
 const getElement = id => document.getElementById(id);
 
@@ -1487,12 +1488,17 @@ function subscribeToChanges() {
 
 async function initializeData() {
     setupFacilitiesSubmenuViews();
-    setupNavigation();
-    createWorkOrderEditModal();
-    setupEventHandlers();
+
+    if (!interfaceInitialized) {
+        setupNavigation();
+        createWorkOrderEditModal();
+        setupEventHandlers();
+        interfaceInitialized = true;
+    }
 
     await renderAll();
     showReminder();
+}
 
     setTimeout(() => {
         const date = getElement("current-date");
@@ -1539,7 +1545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.querySelector(".sidebar").style.display = "none";
         document.querySelector(".main-content").style.display = "none";
     }
- supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
+     supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
         if (event === "SIGNED_OUT" || !sessionState) {
             await stopPresence();
             document.querySelector(".sidebar").style.display = "none";
@@ -1548,8 +1554,19 @@ document.addEventListener("DOMContentLoaded", async () => {
             updateSignedInAccount(null);
             return;
         }
-    // Leave this disabled while WebSocket is unavailable.
-    // subscribeToChanges();
-});
+
+        if (event === "SIGNED_IN" && sessionState.user) {
+            showApplication(sessionState.user);
+            startPresence(sessionState.user).catch(error => {
+                console.error("Unable to start active-user presence:", error);
+            });
+            initializeData().catch(error => {
+                console.error("Unable to initialize dashboard data:", error);
+            });
+        }
+
+        // Leave this disabled while WebSocket is unavailable.
+        // subscribeToChanges();
+    });
 
 });
