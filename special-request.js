@@ -92,6 +92,10 @@
             return false;
         }
 
+        if (typeof playNotificationSound === "function") {
+            playNotificationSound("save");
+        }
+
         await loadRequests();
         return true;
     }
@@ -113,6 +117,10 @@
             console.error("Unable to delete special request:", error);
             alert(error.message);
             return;
+        }
+
+        if (typeof playNotificationSound === "function") {
+            playNotificationSound("delete");
         }
 
         await loadRequests();
@@ -428,6 +436,10 @@
 
         document.body.appendChild(reminder);
         reminder.classList.add("open");
+
+        if (typeof playNotificationSound === "function") {
+            playNotificationSound("reminder");
+        }
 
         const closeReminder = () => {
             reminder.classList.remove("open");
