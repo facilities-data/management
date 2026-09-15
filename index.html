@@ -41,6 +41,42 @@
                 </div>
 
                 <button type="submit" class="btn-submit">Log In</button>
+
+                <button type="button" class="btn-register" id="open-register-user">
+                    Register New User
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="register-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Register New User</h2>
+                <button type="button" class="modal-close" data-close="register-user-modal">
+                    &times;
+                </button>
+            </div>
+
+            <p id="register-user-message" class="register-user-message"></p>
+
+            <form id="register-user-form">
+                <div class="form-group">
+                    <label for="register-email">Email Address</label>
+                    <input id="register-email" type="email" required autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input id="register-password" type="password" required minlength="6" autocomplete="new-password">
+                </div>
+
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input id="register-confirm-password" type="password" required minlength="6" autocomplete="new-password">
+                </div>
+
+                <button type="submit" class="btn-submit">Create User</button>
             </form>
         </div>
     </div>
@@ -603,8 +639,6 @@
                         <option>Operational</option>
                         <option>Attention Needed</option>
                         <option>Out of Service</option>
-                        <option>Depreciated</option>
-                        <option>Disposed/Defective</option>
                     </select>
                 </div>
 
@@ -632,17 +666,13 @@
             color: #94a3b8;
         }
     </style>
-    
+   
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<script>
-    // Replace these values with your Supabase project settings.
-    const SUPABASE_URL = "https://xoysdiavwxfuqygzonjt.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d";
-
+    <script>
     window.supabaseClient = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
+        "https://xoysdiavwxfuqygzonjt.supabase.co",
+        "sb_publishable_66onDZoDXbxVCF7_tOkNzg_2y18mU2d"
     );
 </script>
 <script>
