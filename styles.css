@@ -376,6 +376,57 @@ button:disabled {
     font-weight: bold;
 }
 
+/* Embossed controls on the login card. */
+.login-card .form-group input,
+.login-card .btn-submit {
+    border: 1px solid #0b6962;
+    background: linear-gradient(145deg, #0b6962, #159487);
+    box-shadow:
+        inset 5px 5px 10px #064b4777,
+        inset -4px -4px 9px #57d8c866,
+        3px 3px 7px #0b4f4a55,
+        -2px -2px 5px #ffffff55;
+}
+
+.login-card .form-group input {
+    border-color: #a8ded8;
+    color: #134e4a;
+    background: linear-gradient(145deg, #dff8f5, #ffffff);
+    box-shadow:
+        inset 4px 4px 8px #8bc9c266,
+        inset -4px -4px 8px #ffffffee,
+        2px 2px 5px #0b4f4a22;
+}
+
+.login-card .btn-submit {
+    text-shadow: 1px 1px 0 #0b5752;
+}
+
+.login-card .btn-submit:hover:not(:disabled) {
+    /* Keep the button stationary so its hover target cannot flicker. */
+    transform: none;
+    color: #ecfeff;
+    background: linear-gradient(145deg, #0f766e, #19a894);
+    filter: none;
+    outline: none;
+    text-shadow:
+        0 0 5px #ccfbf1,
+        0 0 12px #5eead4,
+        0 0 20px #14b8a6;
+    box-shadow:
+        inset 6px 6px 12px #064b4788,
+        inset -4px -4px 9px #6ee7d577,
+        0 0 18px #5eead4aa;
+}
+
+.login-card .btn-submit:active:not(:disabled) {
+    transform: translateY(1px);
+    background: linear-gradient(145deg, #095c56, #0f766e);
+    box-shadow:
+        inset 7px 7px 12px #042f2e99,
+        inset -3px -3px 6px #4ccfc077;
+}
+
 .btn-action {
     margin: 2px;
     padding: 7px 10px;
@@ -616,7 +667,35 @@ button:disabled {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    background: linear-gradient(135deg, #115e59, #0f766e);
+    overflow: hidden;
+    perspective: 1400px;
+    background:
+        radial-gradient(circle at 15% 20%, #5eead455 0 12%, transparent 32%),
+        radial-gradient(circle at 85% 80%, #14b8a655 0 10%, transparent 30%),
+        linear-gradient(135deg, #042f2e, #115e59 48%, #0f766e);
+}
+
+.login-screen::before,
+.login-screen::after {
+    position: absolute;
+    content: "";
+    border: 1px solid #99f6e455;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.login-screen::before {
+    width: 480px;
+    height: 480px;
+    transform: translate(-38%, -35%) rotateX(62deg) rotateZ(25deg);
+    box-shadow: 0 0 0 35px #99f6e411, 0 0 0 70px #99f6e408;
+}
+
+.login-screen::after {
+    width: 380px;
+    height: 380px;
+    transform: translate(55%, 45%) rotateX(62deg) rotateZ(-25deg);
+    box-shadow: 0 0 0 28px #99f6e411, 0 0 0 56px #99f6e408;
 }
 
 .login-screen.hidden {
@@ -624,22 +703,115 @@ button:disabled {
 }
 
 .login-card {
+    position: relative;
+    z-index: 1;
     width: min(420px, 100%);
-    padding: 32px;
+    padding: 34px;
+    border: 1px solid #ffffffaa;
     border-top: 6px solid var(--green);
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 15px 40px #0004;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #f8ffff 0%, #d8f5f1 48%, #b9e8e1 100%);
+    box-shadow:
+        10px 10px 0 #0b4f4a66,
+        18px 18px 0 #042f2e33,
+        0 28px 55px #0006,
+        inset 5px 5px 10px #ffffffcc,
+        inset -6px -6px 12px #78bdb555;
     text-align: center;
+    transform: rotateX(3deg) rotateY(-3deg);
+    transform-style: preserve-3d;
     transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
+.login-card::before {
+    position: absolute;
+    z-index: -1;
+    inset: 12px;
+    border-radius: 12px;
+    content: "";
+    box-shadow: 0 0 35px #5eead466;
+    transform: translateZ(-25px);
+}
+
 .login-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-8px) rotateX(0) rotateY(0);
     box-shadow:
-        0 0 18px #5eead4,
-        0 0 38px #14b8a699,
-        0 15px 40px #0004;
+        12px 12px 0 #0b4f4a66,
+        22px 22px 0 #042f2e33,
+        0 34px 65px #0007,
+        0 0 28px #5eead4aa,
+        inset 6px 6px 12px #ffffffdd,
+        inset -7px -7px 14px #78bdb566;
+}
+
+.password-input-wrap {
+    position: relative;
+}
+
+.password-input-wrap input {
+    padding-right: 46px;
+    border-color: #8ccfc7;
+    background: linear-gradient(145deg, #c5ebe6, #f5ffff);
+    box-shadow:
+        inset 4px 4px 8px #76aaa466,
+        inset -3px -3px 7px #ffffffdd,
+        inset 1px 1px 2px #5faaa255;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    padding: 6px;
+    border: 0;
+    border-radius: 0;
+    color: var(--muted);
+    appearance: none;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: none;
+    outline: none;
+    place-items: center;
+    transform: translateY(-50%);
+}
+
+.password-toggle:hover:not(:disabled) {
+    color: var(--nav);
+    background: transparent !important;
+    outline: none;
+    box-shadow: none !important;
+    filter: none;
+    transform: translateY(-50%);
+}
+
+.password-toggle:active:not(:disabled),
+.password-toggle:focus-visible {
+    color: var(--nav);
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: 2px solid #5eead466;
+    outline-offset: 2px;
+    transform: translateY(-50%);
+}
+
+.eye-icon {
+    width: 21px;
+    height: 21px;
+}
+
+.eye-closed {
+    display: none;
+}
+
+.password-toggle[aria-pressed="true"] .eye-open {
+    display: none;
+}
+
+.password-toggle[aria-pressed="true"] .eye-closed {
+    display: block;
 }
 
 .date-input-note {
@@ -654,11 +826,15 @@ button:disabled {
     margin-bottom: 8px;
     color: var(--nav);
     font-size: 24px;
+    text-shadow:
+        1px 1px 0 #ffffff,
+        -1px -1px 0 #6aa9a2;
 }
 
 .login-card p {
     margin-bottom: 24px;
     color: var(--muted);
+    text-shadow: 1px 1px 0 #ffffffaa;
 }
 
 .login-card .form-group {
