@@ -24,6 +24,11 @@ let realtimeRefreshInProgress = false;
 let barcodeStream = null;
 let barcodeDetector = null;
 let barcodeScanFrame = null;
+let dataInitializationPromise = null;
+let dataRenderPromise = null;
+let authStateListenerRegistered = false;
+let eventHandlersRegistered = false;
+let appInitialized = false;
 
 const getElement = id => document.getElementById(id);
 
@@ -69,7 +74,12 @@ function playNotificationSound(type = "success") {
 }
 
 function getToday() {
-    return new Date().toISOString().slice(0, 10);
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
 }
 
 function escapeHtml(value) {
@@ -135,6 +145,10 @@ function getStatusBadge(status) {
 }
 
 async function getCurrentUser() {
+    if (!supabaseClient?.auth) {
+        return null;
+    }
+
     const {
         data: { user }
     } = await supabaseClient.auth.getUser();
@@ -301,23 +315,41 @@ function requireAdminPassword(action = "continue") {
     });
 }
 
-function confirmAdminPassword(event) {
+async function confirmAdminPassword(event) {
     event.preventDefault();
+
+    const password = getElement("admin-password");
+    const error = getElement("password-error");
+    const user = await getCurrentUser();
+
+    if (!password?.value || !user?.email) {
+        if (error) {
+            error.textContent = "Enter the administrator password to continue.";
+            error.style.display = "block";
+        }
+        password?.focus();
+        return;
+    }
+
+    const { error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: user.email,
+        password: password.value
+    });
+
+    if (authError) {
+        if (error) {
+            error.textContent = "Incorrect administrator password.";
+            error.style.display = "block";
+        }
+        password.select();
+        return;
+    }
 
     const resolve = passwordResolver;
     passwordResolver = null;
-
     closeModal("admin-password-modal");
-
-    if (resolve) {
-        const authorized = Boolean(getElement("admin-password").value);
-
-        if (authorized) {
-            playNotificationSound("delete");
-        }
-
-        resolve(authorized);
-    }
+    playNotificationSound("delete");
+    resolve?.(true);
 }
 
 function updateNavigationNotifications() {
@@ -468,29 +500,68 @@ function setupNavigation() {
 async function handleLogin(event) {
     event.preventDefault();
 
-    const email = getElement("login-username").value.trim();
-    const password = getElement("login-password").value;
+    const emailInput = getElement("login-username");
+    const passwordInput = getElement("login-password");
+    const errorElement = getElement("login-error");
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    const email = emailInput?.value.trim() || "";
+    const password = passwordInput?.value || "";
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-    });
+    if (errorElement) {
+        errorElement.classList.remove("visible");
+    }
 
-    if (error || !data.user) {
-        getElement("login-error").textContent =
-            error?.message || "Invalid email or password.";
-        getElement("login-error").classList.add("visible");
-        getElement("login-password").select();
+    if (!email || !password) {
+        if (errorElement) {
+            errorElement.textContent = "Enter your email address and password.";
+            errorElement.classList.add("visible");
+        }
         return;
     }
 
-    sessionStorage.setItem("fms_logged_in", "true");
-    sessionStorage.setItem("fms_current_user", data.user.email || email);
-    sessionStorage.setItem("fms_current_role", "Administrator");
+    if (!supabaseClient?.auth) {
+        if (errorElement) {
+            errorElement.textContent = "Login service is unavailable. Refresh the page and try again.";
+            errorElement.classList.add("visible");
+        }
+        return;
+    }
 
-            showApplication(data.user);
+    submitButton && (submitButton.disabled = true);
+
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
+
+        if (error || !data?.user) {
+            if (errorElement) {
+                errorElement.textContent = error?.message || "Invalid email or password.";
+                errorElement.classList.add("visible");
+            }
+            passwordInput?.select();
+            return;
+        }
+
+        sessionStorage.setItem("fms_logged_in", "true");
+        sessionStorage.setItem("fms_current_user", data.user.email || email);
+        sessionStorage.setItem("fms_current_role", "Administrator");
+
+        showApplication(data.user);
         await startPresence(data.user);
         await initializeData();
+    } catch (error) {
+        console.error("Login failed:", error);
+        if (errorElement) {
+            errorElement.textContent = "Unable to contact the login service. Check your connection and try again.";
+            errorElement.classList.add("visible");
+        }
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+    }
 }
 
 async function logout() {
@@ -498,18 +569,24 @@ async function logout() {
     await stopPresence();
     await supabaseClient.auth.signOut();
 
+    appInitialized = false;
+    dataInitializationPromise = null;
     sessionStorage.clear();
 
     getElement("login-form")?.reset();
-    getElement("login-username").value = "";
-    getElement("login-password").value = "";
+
+    const loginUsername = getElement("login-username");
+    const loginPassword = getElement("login-password");
+
+    if (loginUsername) loginUsername.value = "";
+    if (loginPassword) loginPassword.value = "";
     getElement("login-error")?.classList.remove("visible");
     updateSignedInAccount(null);
     
     getElement("login-screen")?.classList.remove("hidden");
-    getElement("login-screen").style.display = "flex";
-    document.querySelector(".sidebar").style.display = "none";
-    document.querySelector(".main-content").style.display = "none";
+    getElement("login-screen")?.style.setProperty("display", "flex");
+    document.querySelector(".sidebar")?.style.setProperty("display", "none");
+    document.querySelector(".main-content")?.style.setProperty("display", "none");
 
     getElement("login-username")?.focus();
 }
@@ -1305,24 +1382,43 @@ function showReminder() {
 }
 
 async function renderAll() {
-    await loadAllData();
+    if (dataRenderPromise) {
+        return dataRenderPromise;
+    }
 
-    getElement("count-assets-metric").textContent = cache.assets.length;
-    getElement("count-open").textContent = cache.orders.filter(order =>
-        order.status !== "Completed" &&
-        order.status !== "Cancelled"
-    ).length;
-    getElement("count-completed").textContent = cache.orders.filter(order =>
-        order.status === "Completed"
-    ).length;
-    getElement("count-upcoming-pms").textContent = getUpcomingTasks().length;
+    dataRenderPromise = (async () => {
+        await loadAllData();
 
-    renderOrders();
-    renderAssets();
-    renderProjects();
-    renderVendors();
-    renderCalendar();
-    updateNavigationNotifications();
+        getElement("count-assets-metric")?.replaceChildren(
+            document.createTextNode(String(cache.assets.length))
+        );
+        getElement("count-open")?.replaceChildren(
+            document.createTextNode(String(cache.orders.filter(order =>
+                order.status !== "Completed" && order.status !== "Cancelled"
+            ).length))
+        );
+        getElement("count-completed")?.replaceChildren(
+            document.createTextNode(String(cache.orders.filter(order =>
+                order.status === "Completed"
+            ).length))
+        );
+        getElement("count-upcoming-pms")?.replaceChildren(
+            document.createTextNode(String(getUpcomingTasks().length))
+        );
+
+        renderOrders();
+        renderAssets();
+        renderProjects();
+        renderVendors();
+        renderCalendar();
+        updateNavigationNotifications();
+    })();
+
+    try {
+        return await dataRenderPromise;
+    } finally {
+        dataRenderPromise = null;
+    }
 }
 
 function excelCell(value) {
@@ -1422,7 +1518,7 @@ async function scanBarcodeFrame() {
 async function startBarcodeScanner() {
     const errorElement = getElement("barcode-scan-error");
 
-    if (!("BarcodeDetector" in window)) {
+    if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) {
         alert("Barcode scanning is not supported by this mobile browser. Enter the asset tag manually.");
         return;
     }
@@ -1455,29 +1551,39 @@ async function startBarcodeScanner() {
 }
 
 function setupEventHandlers() {
-    getElement("login-form").onsubmit = handleLogin;
-    getElement("facility-form").onsubmit = addOrder;
-    getElement("project-form").onsubmit = saveProject;
-    getElement("pms-form").onsubmit = savePms;
-    getElement("vendor-form").onsubmit = saveVendor;
-    getElement("asset-form").onsubmit = saveAsset;
-    getElement("admin-password-form").onsubmit = confirmAdminPassword;
+    if (eventHandlersRegistered) {
+        return;
+    }
 
-    getElement("date-reported").value = getToday();
+    eventHandlersRegistered = true;
 
-    getElement("add-project").onclick = () => editProject();
-    getElement("add-pms").onclick = () => editPms();
-    getElement("add-vendor").onclick = () => editVendor();
-    getElement("btn-add-asset").onclick = () => editAsset();
-    getElement("scan-asset-barcode").onclick = () => {
-        startBarcodeScanner();
-    };
-    getElement("close-barcode-scanner").onclick = () => closeModal("barcode-scanner-modal");
+    getElement("login-form")?.addEventListener("submit", handleLogin);
+    getElement("facility-form")?.addEventListener("submit", addOrder);
+    getElement("project-form")?.addEventListener("submit", saveProject);
+    getElement("pms-form")?.addEventListener("submit", savePms);
+    getElement("vendor-form")?.addEventListener("submit", saveVendor);
+    getElement("asset-form")?.addEventListener("submit", saveAsset);
+    getElement("admin-password-form")?.addEventListener("submit", confirmAdminPassword);
 
-    getElement("calendar-year").onchange = renderCalendar;
-    getElement("asset-search").oninput = renderAssets;
-    getElement("order-search").oninput = renderOrders;
-    getElement("download-report").onclick = () => {
+    const reportedDate = getElement("date-reported");
+    if (reportedDate && !reportedDate.value) {
+        reportedDate.value = getToday();
+    }
+
+    getElement("add-project")?.addEventListener("click", () => editProject());
+    getElement("add-pms")?.addEventListener("click", () => editPms());
+    getElement("add-vendor")?.addEventListener("click", () => editVendor());
+    getElement("btn-add-asset")?.addEventListener("click", () => editAsset());
+    getElement("scan-asset-barcode")?.addEventListener("click", startBarcodeScanner);
+    getElement("close-barcode-scanner")?.addEventListener(
+        "click",
+        () => closeModal("barcode-scanner-modal")
+    );
+
+    getElement("calendar-year")?.addEventListener("change", renderCalendar);
+    getElement("asset-search")?.addEventListener("input", renderAssets);
+    getElement("order-search")?.addEventListener("input", renderOrders);
+    getElement("download-report")?.addEventListener("click", () => {
         downloadReport(
             "Facilities Management Report",
             [
@@ -1489,7 +1595,7 @@ function setupEventHandlers() {
             ],
             "facilities-report"
         );
-    };
+    });
 
     const reports = [
         ["download-pms-report", "PMS Calendar", "pms", "pms-calendar"],
@@ -1500,15 +1606,17 @@ function setupEventHandlers() {
     ];
 
     reports.forEach(([buttonId, title, key, fileName]) => {
-        getElement(buttonId).onclick = () =>
-            downloadReport(title, cache[key], fileName);
+        getElement(buttonId)?.addEventListener(
+            "click",
+            () => downloadReport(title, cache[key], fileName)
+        );
     });
 
-    getElement("logout-button").onclick = async () => {
+    getElement("logout-button")?.addEventListener("click", async () => {
         if (confirm("Are you sure you want to log out?")) {
             await logout();
         }
-    };
+    });
 
     document.querySelectorAll("[data-close]").forEach(button => {
         button.onclick = () => closeModal(button.dataset.close);
@@ -1571,68 +1679,97 @@ async function unsubscribeFromChanges() {
 }
 
 async function initializeData() {
-    setupFacilitiesSubmenuViews();
-    setupNavigation();
-    createWorkOrderEditModal();
-    setupEventHandlers();
+    if (appInitialized) {
+        return;
+    }
 
-    await renderAll();
-    subscribeToChanges();
-    showReminder();
+    if (dataInitializationPromise) {
+        return dataInitializationPromise;
+    }
 
-    setTimeout(() => {
-        const date = getElement("current-date");
+    dataInitializationPromise = (async () => {
+        setupFacilitiesSubmenuViews();
+        setupNavigation();
+        createWorkOrderEditModal();
+        setupEventHandlers();
 
-        if (date) {
-            date.textContent = new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-            });
-        }
-    }, 100);
+        await renderAll();
+        subscribeToChanges();
+        showReminder();
+        appInitialized = true;
+
+        setTimeout(() => {
+            const date = getElement("current-date");
+
+            if (date) {
+                date.textContent = new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
+                });
+            }
+        }, 100);
+    })();
+
+    try {
+        return await dataInitializationPromise;
+    } finally {
+        dataInitializationPromise = null;
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    getElement("login-form").onsubmit = handleLogin;
+    setupEventHandlers();
 
-    const {
-        data: { session }
-    } = await supabaseClient.auth.getSession();
+    if (!supabaseClient?.auth) {
+        const error = getElement("login-error");
+        if (error) {
+            error.textContent = "Login service is unavailable. Refresh the page and try again.";
+            error.classList.add("visible");
+        }
+        return;
+    }
+
+    const { data: { session }, error: sessionError } =
+        await supabaseClient.auth.getSession();
+
+    if (sessionError) {
+        console.error("Unable to restore the login session:", sessionError);
+    }
 
     if (session) {
         sessionStorage.setItem("fms_logged_in", "true");
-        sessionStorage.setItem(
-            "fms_current_user",
-            session.user.email || ""
-        );
-
+        sessionStorage.setItem("fms_current_user", session.user.email || "");
         sessionStorage.setItem("fms_current_role", "Administrator");
-
         showApplication(session.user);
         await startPresence(session.user);
         await initializeData();
     } else {
-        document.querySelector(".sidebar").style.display = "none";
-        document.querySelector(".main-content").style.display = "none";
+        document.querySelector(".sidebar")?.style.setProperty("display", "none");
+        document.querySelector(".main-content")?.style.setProperty("display", "none");
     }
- supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
-        if (event === "SIGNED_OUT" || !sessionState) {
-            await unsubscribeFromChanges();
-            await stopPresence();
-            document.querySelector(".sidebar").style.display = "none";
-            document.querySelector(".main-content").style.display = "none";
-            getElement("login-screen")?.classList.remove("hidden");
-            updateSignedInAccount(null);
-            return;
-        }
 
-        if (event === "SIGNED_IN" && sessionState) {
-            showApplication(sessionState.user);
-            await startPresence(sessionState.user);
-            await initializeData();
-        }
-});
+    if (!authStateListenerRegistered) {
+        authStateListenerRegistered = true;
+        supabaseClient.auth.onAuthStateChange(async (event, sessionState) => {
+            if (event === "SIGNED_OUT" || !sessionState) {
+                await unsubscribeFromChanges();
+                await stopPresence();
+                dataInitializationPromise = null;
+                appInitialized = false;
+                document.querySelector(".sidebar")?.style.setProperty("display", "none");
+                document.querySelector(".main-content")?.style.setProperty("display", "none");
+                getElement("login-screen")?.classList.remove("hidden");
+                updateSignedInAccount(null);
+                return;
+            }
 
+            if (event === "SIGNED_IN" && sessionState) {
+                showApplication(sessionState.user);
+                await startPresence(sessionState.user);
+                await initializeData();
+            }
+        });
+    }
 });
