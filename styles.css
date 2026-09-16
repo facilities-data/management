@@ -796,7 +796,7 @@ button:disabled {
 
 .password-toggle .eye-icon path,
 .password-toggle .eye-icon circle {
-    stroke: #115e59;
+    stroke: #115e59a2;
 }
 
 .password-toggle:hover:not(:disabled) {
