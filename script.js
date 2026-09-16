@@ -20,6 +20,7 @@ let passwordResolver = null;
 let presenceChannel = null;
 let realtimeChannels = [];
 let realtimeRefreshTimer = null;
+let realtimeFallbackTimer = null;
 let realtimeRefreshInProgress = false;
 let barcodeStream = null;
 let barcodeDetector = null;
@@ -1624,7 +1625,7 @@ function setupEventHandlers() {
 }
 
 function subscribeToChanges() {
-    if (realtimeChannels.length) {
+    if (!supabaseClient?.channel || realtimeChannels.length) {
         return;
     }
 
@@ -1646,8 +1647,9 @@ function subscribeToChanges() {
     };
 
     Object.entries(TABLES).forEach(([key, table]) => {
+        const channelName = `fms-${key}-changes`;
         const channel = supabaseClient
-            .channel(`fms-${key}-changes`)
+            .channel(channelName)
             .on(
                 "postgres_changes",
                 {
@@ -1657,19 +1659,42 @@ function subscribeToChanges() {
                 },
                 refreshFromRealtime
             )
-            .subscribe(status => {
+            .subscribe(async status => {
+                if (status === "SUBSCRIBED") {
+                    return;
+                }
+
                 if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-                    console.error(`Realtime subscription failed for ${table}.`);
+                    console.warn(
+                        `Realtime is unavailable for ${table}; automatic refresh will be used instead.`
+                    );
+
+                    const index = realtimeChannels.indexOf(channel);
+
+                    if (index >= 0) {
+                        realtimeChannels.splice(index, 1);
+                    }
+
+                    await supabaseClient.removeChannel(channel);
                 }
             });
 
         realtimeChannels.push(channel);
     });
+
+    clearInterval(realtimeFallbackTimer);
+    realtimeFallbackTimer = setInterval(() => {
+        if (!document.hidden && appInitialized && !realtimeRefreshInProgress) {
+            renderAll();
+        }
+    }, 60000);
 }
 
 async function unsubscribeFromChanges() {
     clearTimeout(realtimeRefreshTimer);
     realtimeRefreshTimer = null;
+    clearInterval(realtimeFallbackTimer);
+    realtimeFallbackTimer = null;
 
     await Promise.all(
         realtimeChannels.map(channel => supabaseClient.removeChannel(channel))
