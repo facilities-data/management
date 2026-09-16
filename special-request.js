@@ -2,45 +2,70 @@
     const supabaseClient = window.supabaseClient;
     const TABLE_NAME = "special_requests";
     let requests = [];
+    let currentUser = null;
     let reminderLoadStarted = false;
+    let requestLoadPromise = null;
+    let specialRequestChannel = null;
 
     const getElement = id => document.getElementById(id);
+    const escapeValue = value =>
+        typeof escapeHtml === "function"
+            ? escapeHtml(value)
+            : String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
 
-    const escapeValue = value => {
-        const element = document.createElement("div");
-        element.textContent = value ?? "";
-        return element.innerHTML;
-    };
-
-    const createId = () => crypto.randomUUID();
+    const createId = () =>
+        globalThis.crypto?.randomUUID?.() ||
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     async function getCurrentUser() {
+        if (currentUser) {
+            return currentUser;
+        }
+
         const {
             data: { user }
         } = await supabaseClient.auth.getUser();
 
-        return user;
+        currentUser = user;
+        return currentUser;
     }
 
     async function loadRequests() {
-        const { data, error } = await supabaseClient
-            .from(TABLE_NAME)
-            .select("*")
-            .order("created_at", { ascending: false });
-
-        if (error) {
-            console.error("Unable to load special requests:", error);
-            alert(
-                "Unable to load special requests. Check the special_requests table and Supabase policies."
-            );
-            requests = [];
-            renderRequests();
-            return false;
+        if (requestLoadPromise) {
+            return requestLoadPromise;
         }
 
-        requests = data || [];
-        renderRequests();
-        return true;
+        requestLoadPromise = (async () => {
+            const { data, error } = await supabaseClient
+                .from(TABLE_NAME)
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                console.error("Unable to load special requests:", error);
+                alert(
+                    "Unable to load special requests. Check the special_requests table and Supabase policies."
+                );
+                requests = [];
+                renderRequests();
+                return false;
+            }
+
+            requests = data || [];
+            renderRequests();
+            return true;
+        })();
+
+        try {
+            return await requestLoadPromise;
+        } finally {
+            requestLoadPromise = null;
+        }
     }
 
     async function initializeSpecialRequestReminder() {
@@ -55,6 +80,7 @@
         }
 
         reminderLoadStarted = true;
+        subscribeToSpecialRequestChanges();
 
         const loaded = await loadRequests();
 
@@ -82,9 +108,11 @@
                 .from(TABLE_NAME)
                 .update(record)
                 .eq("id", existingId)
+                .select()
             : await supabaseClient
                 .from(TABLE_NAME)
-                .insert(record);
+                .insert(record)
+                .select();
 
         if (result.error) {
             console.error("Unable to save special request:", result.error);
@@ -96,7 +124,16 @@
             playNotificationSound("save");
         }
 
-        await loadRequests();
+        const savedRequest = result.data?.[0] || record;
+        const index = requests.findIndex(item => item.id === existingId);
+
+        if (index >= 0) {
+            requests[index] = { ...requests[index], ...savedRequest };
+        } else {
+            requests.unshift(savedRequest);
+        }
+
+        renderRequests();
         return true;
     }
 
@@ -123,7 +160,8 @@
             playNotificationSound("delete");
         }
 
-        await loadRequests();
+        requests = requests.filter(request => request.id !== id);
+        renderRequests();
     }
 
     function createSpecialRequestInterface() {
@@ -264,6 +302,19 @@
         getElement("close-special-request").onclick = closeRequestForm;
         getElement("special-request-form").onsubmit = saveRequest;
 
+        const tableBody = document.querySelector("#special-requests-table tbody");
+
+        tableBody.onclick = event => {
+            const editButton = event.target.closest("[data-edit-request]");
+            const deleteButton = event.target.closest("[data-delete-request]");
+
+            if (editButton) {
+                openRequestForm(editButton.dataset.editRequest);
+            } else if (deleteButton) {
+                deleteRequest(deleteButton.dataset.deleteRequest);
+            }
+        };
+
         renderRequests();
     }
 
@@ -355,16 +406,6 @@
             `;
 
             tableBody.appendChild(row);
-        });
-
-        tableBody.querySelectorAll("[data-edit-request]").forEach(button => {
-            button.onclick = () =>
-                openRequestForm(button.dataset.editRequest);
-        });
-
-        tableBody.querySelectorAll("[data-delete-request]").forEach(button => {
-            button.onclick = () =>
-                deleteRequest(button.dataset.deleteRequest);
         });
 
         const pendingCount = requests.filter(request =>
@@ -480,7 +521,11 @@
     }
 
     function subscribeToSpecialRequestChanges() {
-        supabaseClient
+        if (specialRequestChannel) {
+            return;
+        }
+
+        specialRequestChannel = supabaseClient
             .channel("special-request-changes")
             .on(
                 "postgres_changes",
@@ -489,11 +534,18 @@
                     schema: "public",
                     table: TABLE_NAME
                 },
-                async () => {
-                    await loadRequests();
-                }
+                () => loadRequests()
             )
             .subscribe();
+    }
+
+    async function unsubscribeFromSpecialRequestChanges() {
+        if (!specialRequestChannel) {
+            return;
+        }
+
+        await supabaseClient.removeChannel(specialRequestChannel);
+        specialRequestChannel = null;
     }
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -508,11 +560,23 @@
             }
 
             if (event === "SIGNED_OUT") {
+                currentUser = null;
                 reminderLoadStarted = false;
                 requests = [];
+                renderRequests();
+                unsubscribeFromSpecialRequestChanges();
+                getElement("special-request-reminder-modal")?.remove();
+            }
+
+            if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+                subscribeToSpecialRequestChanges();
+            }
+
+            if (session) {
+                currentUser = session.user;
             }
         });
 
-        // subscribeToSpecialRequestChanges();
+        subscribeToSpecialRequestChanges();
     });
 })();
