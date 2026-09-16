@@ -760,6 +760,7 @@ button:disabled {
 
 .password-toggle {
     position: absolute;
+    z-index: 2;
     top: 50%;
     right: 8px;
     display: grid;
@@ -768,7 +769,7 @@ button:disabled {
     padding: 6px;
     border: 0;
     border-radius: 0;
-    color: var(--muted);
+    color: #115e59;
     appearance: none;
     background: transparent !important;
     box-shadow: none !important;
@@ -776,6 +777,26 @@ button:disabled {
     outline: none;
     place-items: center;
     transform: translateY(-50%);
+}
+
+.password-toggle .eye-icon {
+    display: none;
+    width: 21px;
+    height: 21px;
+    overflow: visible;
+}
+
+.password-toggle .eye-open {
+    display: block;
+}
+
+.password-toggle .eye-closed {
+    display: none;
+}
+
+.password-toggle .eye-icon path,
+.password-toggle .eye-icon circle {
+    stroke: #115e59;
 }
 
 .password-toggle:hover:not(:disabled) {
@@ -800,10 +821,6 @@ button:disabled {
 .eye-icon {
     width: 21px;
     height: 21px;
-}
-
-.eye-closed {
-    display: none;
 }
 
 .password-toggle[aria-pressed="true"] .eye-open {
