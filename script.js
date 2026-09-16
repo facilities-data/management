@@ -1559,6 +1559,19 @@ function setupEventHandlers() {
     eventHandlersRegistered = true;
 
     getElement("login-form")?.addEventListener("submit", handleLogin);
+    getElement("toggle-login-password")?.addEventListener("click", () => {
+        const password = getElement("login-password");
+        const toggle = getElement("toggle-login-password");
+
+        if (!password || !toggle) {
+            return;
+        }
+
+        const isVisible = password.type === "text";
+        password.type = isVisible ? "password" : "text";
+        toggle.setAttribute("aria-pressed", String(!isVisible));
+        toggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+    });
     getElement("facility-form")?.addEventListener("submit", addOrder);
     getElement("project-form")?.addEventListener("submit", saveProject);
     getElement("pms-form")?.addEventListener("submit", savePms);
