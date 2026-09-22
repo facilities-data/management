@@ -1413,25 +1413,9 @@ async function saveSafetyEquipment(event) {
             console.warn("Unable to save inspection history:", historyError);
         }
 
-        // Reload after both the core record and monthly history have been saved
-        // so the table reflects the complete server state immediately. Keep the
-        // optimistic cache if a refresh briefly returns stale data.
-        const previousItem = cache.safety.find(record => record.id === id);
-        const refreshedItems = await loadTable("safety");
-        const refreshedItem = refreshedItems.find(record => record.id === id);
-
-        if (previousItem && refreshedItem &&
-            refreshedItem.updated_at && previousItem.updated_at &&
-            refreshedItem.updated_at < previousItem.updated_at) {
-            const refreshedIndex = cache.safety.findIndex(record => record.id === id);
-            if (refreshedIndex >= 0) {
-                cache.safety[refreshedIndex] = {
-                    ...refreshedItem,
-                    ...previousItem
-                };
-            }
-        }
-
+        // Render from the optimistic cache immediately. Realtime will deliver
+        // the canonical row to other open sessions without a stale read racing
+        // this update and replacing the new status.
         renderSafetyEquipment();
         updateNavigationNotifications();
 
@@ -2227,12 +2211,53 @@ function setupEventHandlers() {
     });
 }
 
+function applySafetyRealtimeChange(payload) {
+    const record = payload?.new || payload?.old;
+    const recordId = record?.id;
+
+    if (!recordId) {
+        return;
+    }
+
+    if (payload.eventType === "DELETE") {
+        cache.safety = cache.safety.filter(item => item.id !== recordId);
+    } else if (payload.eventType === "INSERT") {
+        cache.safety = [
+            record,
+            ...cache.safety.filter(item => item.id !== recordId)
+        ];
+    } else {
+        const index = cache.safety.findIndex(item => item.id === recordId);
+
+        if (index >= 0) {
+            cache.safety[index] = {
+                ...cache.safety[index],
+                ...record
+            };
+        } else {
+            cache.safety.unshift(record);
+        }
+    }
+
+    renderSafetyEquipment();
+    updateNavigationNotifications();
+}
+
 function subscribeToChanges() {
     if (!supabaseClient?.channel || realtimeChannels.length) {
         return;
     }
 
-    const refreshFromRealtime = () => {
+    const refreshFromRealtime = payload => {
+        // Safety rows are applied directly from the realtime payload. Do not
+        // immediately call renderAll(), because a concurrent SELECT can return
+        // the previous row and overwrite the freshly received status.
+        if (payload?.table === TABLES.safety) {
+            applySafetyRealtimeChange(payload);
+            return;
+        }
+
+        clearTimeout(realtimeRefreshTimer);
         clearTimeout(realtimeRefreshTimer);
         realtimeRefreshTimer = setTimeout(async () => {
             if (realtimeRefreshInProgress) {
