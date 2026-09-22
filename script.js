@@ -1634,11 +1634,16 @@ function setupCalendarPanning() {
 
         isDragging = false;
         calendar.classList.remove("is-panning");
-        calendar.releasePointerCapture?.(event.pointerId);
+
+        if (event?.pointerId !== undefined &&
+            calendar.hasPointerCapture?.(event.pointerId)) {
+            calendar.releasePointerCapture(event.pointerId);
+        }
     };
 
     calendar.addEventListener("pointerup", stopPanning);
     calendar.addEventListener("pointercancel", stopPanning);
+    calendar.addEventListener("lostpointercapture", stopPanning);
 
     calendar.addEventListener("click", event => {
         if (!movedDuringDrag) {
@@ -1692,7 +1697,13 @@ function renderCalendar() {
                 return date >= startDate && date <= endDate;
             })
             .map(task => `
-                <div class="maintenance-dot ${task.status === "Done" ? "done" : ""}">
+                <div class="maintenance-dot ${
+                    task.status === "Done"
+                        ? "done"
+                        : ["In Progress", "InProgress"].includes(task.status)
+                            ? "in-progress"
+                            : ""
+                }">
                     <strong>${escapeHtml(task.asset)}</strong>
                     <br>
                     ${escapeHtml(task.type)}
