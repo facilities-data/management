@@ -660,7 +660,7 @@ button:disabled {
 }
 
 .login-screen {
-    position: fixed;
+     position: fixed;
     z-index: 100;
     inset: 0;
     display: flex;
@@ -669,10 +669,14 @@ button:disabled {
     padding: 20px;
     overflow: hidden;
     perspective: 1400px;
-    background:
-        radial-gradient(circle at 15% 20%, #5eead455 0 12%, transparent 32%),
-        radial-gradient(circle at 85% 80%, #14b8a655 0 10%, transparent 30%),
-        linear-gradient(135deg, #042f2e, #115e59 48%, #0f766e);
+    background-color: #0b4f4a;
+    background-image:
+        linear-gradient(#063f3a66, #063f3a66),
+        url("./arcadia-background-google-meet-3.png");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
 }
 
 .login-screen::before,
