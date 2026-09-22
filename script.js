@@ -23,6 +23,7 @@ let presenceChannel = null;
 let realtimeChannels = [];
 let realtimeRefreshTimer = null;
 let realtimeFallbackTimer = null;
+let safetyFallbackTimer = null;
 let realtimeRefreshInProgress = false;
 let barcodeStream = null;
 let barcodeDetector = null;
@@ -1376,7 +1377,7 @@ async function saveSafetyEquipment(event) {
         remarks: item.remarks
     };
 
-    const saved = await saveRecord("safety", item, originalId, true, true);
+    const saved = await saveRecord("safety", item, originalId, false, true);
 
     if (saved) {
         // Preserve monthly activity locally when the optional database column is
@@ -1395,9 +1396,14 @@ async function saveSafetyEquipment(event) {
             console.warn("Unable to save inspection history:", historyError);
         }
 
+        // Reload after both the core record and monthly history have been saved
+        // so the table reflects the complete server state immediately.
+        await loadTable("safety");
+        renderSafetyEquipment();
+        updateNavigationNotifications();
+
         closeModal("safety-equipment-modal");
         event.target.reset();
-        await renderAll();
     }
 }
 
@@ -2252,6 +2258,19 @@ function subscribeToChanges() {
             renderAll();
         }
     }, 60000);
+
+    // Safety inspections may also update localStorage when the optional
+    // inspection_history column is unavailable, so refresh this table more
+    // often than the general fallback interval.
+    clearInterval(safetyFallbackTimer);
+    safetyFallbackTimer = setInterval(() => {
+        if (!document.hidden && appInitialized && !realtimeRefreshInProgress) {
+            loadTable("safety").then(() => {
+                renderSafetyEquipment();
+                updateNavigationNotifications();
+            });
+        }
+    }, 10000);
 }
 
 async function unsubscribeFromChanges() {
@@ -2259,6 +2278,8 @@ async function unsubscribeFromChanges() {
     realtimeRefreshTimer = null;
     clearInterval(realtimeFallbackTimer);
     realtimeFallbackTimer = null;
+    clearInterval(safetyFallbackTimer);
+    safetyFallbackTimer = null;
 
     await Promise.all(
         realtimeChannels.map(channel => supabaseClient.removeChannel(channel))
