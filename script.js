@@ -1127,14 +1127,17 @@ function getSafetyInspectionHistory(item) {
         }
     }
 
-    // Keep older records visible until their first monthly inspection is saved
-    // into the inspection history column.
+    // The core columns are updated before the optional history column. Always
+    // overlay the current inspection fields so a delayed/missing history
+    // update cannot leave the displayed status stale.
     const legacyMonth = getInspectionMonthValue(item?.inspection_month);
-    if (legacyMonth && !history[legacyMonth]) {
+    if (legacyMonth) {
+        const currentActivity = history[legacyMonth] || {};
         history[legacyMonth] = {
-            inspected: item.inspected || "",
-            status: item.status || "",
-            remarks: item.remarks || ""
+            ...currentActivity,
+            inspected: item.inspected || currentActivity.inspected || "",
+            status: item.status || currentActivity.status || "",
+            remarks: item.remarks || currentActivity.remarks || ""
         };
     }
 
@@ -1380,6 +1383,20 @@ async function saveSafetyEquipment(event) {
     const saved = await saveRecord("safety", item, originalId, false, true);
 
     if (saved) {
+        // Update the local cache immediately so the new status is visible even
+        // if the database replica or realtime event is briefly delayed.
+        const cacheIndex = cache.safety.findIndex(record => record.id === originalId);
+        const savedItem = { ...item, updated_at: new Date().toISOString() };
+
+        if (cacheIndex >= 0) {
+            cache.safety[cacheIndex] = {
+                ...cache.safety[cacheIndex],
+                ...savedItem
+            };
+        } else {
+            cache.safety.unshift(savedItem);
+        }
+
         // Preserve monthly activity locally when the optional database column is
         // unavailable. If the column exists, also persist it in Supabase.
         const historyKey = `fms-safety-history-${id}`;
@@ -1397,8 +1414,24 @@ async function saveSafetyEquipment(event) {
         }
 
         // Reload after both the core record and monthly history have been saved
-        // so the table reflects the complete server state immediately.
-        await loadTable("safety");
+        // so the table reflects the complete server state immediately. Keep the
+        // optimistic cache if a refresh briefly returns stale data.
+        const previousItem = cache.safety.find(record => record.id === id);
+        const refreshedItems = await loadTable("safety");
+        const refreshedItem = refreshedItems.find(record => record.id === id);
+
+        if (previousItem && refreshedItem &&
+            refreshedItem.updated_at && previousItem.updated_at &&
+            refreshedItem.updated_at < previousItem.updated_at) {
+            const refreshedIndex = cache.safety.findIndex(record => record.id === id);
+            if (refreshedIndex >= 0) {
+                cache.safety[refreshedIndex] = {
+                    ...refreshedItem,
+                    ...previousItem
+                };
+            }
+        }
+
         renderSafetyEquipment();
         updateNavigationNotifications();
 
