@@ -530,6 +530,11 @@ button:disabled {
     white-space: normal;
 }
 
+.maintenance-dot.in-progress {
+    color: #ccfbf1;
+    background: #076961da;
+}
+
 .maintenance-dot.done {
     color: #047857;
     background: #d1fae5;
