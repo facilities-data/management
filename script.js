@@ -1583,6 +1583,74 @@ async function saveVendor(event) {
     }
 }
 
+function setupCalendarPanning() {
+    const calendar = getElement("maintenance-calendar");
+
+    if (!calendar || calendar.dataset.panReady === "true") {
+        return;
+    }
+
+    calendar.dataset.panReady = "true";
+
+    let startX = 0;
+    let startScrollLeft = 0;
+    let isDragging = false;
+    let movedDuringDrag = false;
+
+    calendar.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" && event.button !== 0) {
+            return;
+        }
+
+        startX = event.clientX;
+        startScrollLeft = calendar.scrollLeft;
+        isDragging = true;
+        movedDuringDrag = false;
+        calendar.classList.add("is-panning");
+        calendar.setPointerCapture?.(event.pointerId);
+    });
+
+    calendar.addEventListener("pointermove", event => {
+        if (!isDragging) {
+            return;
+        }
+
+        const distance = event.clientX - startX;
+
+        if (Math.abs(distance) > 5) {
+            movedDuringDrag = true;
+        }
+
+        if (movedDuringDrag) {
+            event.preventDefault();
+            calendar.scrollLeft = startScrollLeft - distance;
+        }
+    });
+
+    const stopPanning = event => {
+        if (!isDragging) {
+            return;
+        }
+
+        isDragging = false;
+        calendar.classList.remove("is-panning");
+        calendar.releasePointerCapture?.(event.pointerId);
+    };
+
+    calendar.addEventListener("pointerup", stopPanning);
+    calendar.addEventListener("pointercancel", stopPanning);
+
+    calendar.addEventListener("click", event => {
+        if (!movedDuringDrag) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        movedDuringDrag = false;
+    }, true);
+}
+
 function renderCalendar() {
     const year = Number(getElement("calendar-year")?.value);
     const calendar = getElement("maintenance-calendar");
@@ -1592,6 +1660,7 @@ function renderCalendar() {
     }
 
     calendar.textContent = "";
+    setupCalendarPanning();
 
     const firstDay = new Date(year, 0, 1);
     firstDay.setDate(firstDay.getDate() - ((firstDay.getDay() + 6) % 7));
