@@ -679,29 +679,6 @@ button:disabled {
     background-attachment: fixed;
 }
 
-.login-screen::before,
-.login-screen::after {
-    position: absolute;
-    content: "";
-    border: 1px solid #99f6e455;
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-.login-screen::before {
-    width: 480px;
-    height: 480px;
-    transform: translate(-38%, -35%) rotateX(62deg) rotateZ(25deg);
-    box-shadow: 0 0 0 35px #99f6e411, 0 0 0 70px #99f6e408;
-}
-
-.login-screen::after {
-    width: 380px;
-    height: 380px;
-    transform: translate(55%, 45%) rotateX(62deg) rotateZ(-25deg);
-    box-shadow: 0 0 0 28px #99f6e411, 0 0 0 56px #99f6e408;
-}
-
 .login-screen.hidden {
     display: none;
 }
