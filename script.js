@@ -1168,11 +1168,21 @@ function getLatestSafetyInspection(item) {
     };
 }
 
+function getSafetyCalendarYear() {
+    const input = getElement("safety-calendar-year");
+    const year = Number(input?.value);
+
+    return Number.isInteger(year) && year >= 1 && year <= 9999
+        ? year
+        : new Date().getFullYear();
+}
+
 function getSafetyMonthCalendar(item) {
     const history = getSafetyInspectionHistory(item);
-    const currentYear = new Date().getFullYear();
+    const calendarYear = getSafetyCalendarYear();
+    const yearValue = String(calendarYear).padStart(4, "0");
     const months = Array.from({ length: 12 }, (_, index) => {
-        const month = `${currentYear}-${String(index + 1).padStart(2, "0")}`;
+        const month = `${yearValue}-${String(index + 1).padStart(2, "0")}`;
         const activity = history[month] || {};
         const date = activity.inspected || "";
         const status = activity.status || "";
@@ -1190,7 +1200,7 @@ function getSafetyMonthCalendar(item) {
     }).join("");
 
     return `<div class="inspection-calendar">
-        <div class="inspection-calendar-year">${currentYear}</div>
+        <div class="inspection-calendar-year">${yearValue}</div>
         <div class="inspection-month-grid">${months}</div>
     </div>`;
 }
