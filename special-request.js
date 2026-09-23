@@ -441,14 +441,14 @@
         reminder.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Special Request Reminder</h2>
+                    <h2>Other Task Reminder</h2>
                     <button type="button" class="modal-close">
                         &times;
                     </button>
                 </div>
 
                 <p>
-                    These special requests still require attention:
+                    These tasks still require attention:
                 </p>
 
                 <div>
