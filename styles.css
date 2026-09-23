@@ -832,6 +832,29 @@ button:disabled {
     font-style: italic;
 }
 
+.safety-equipment-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.safety-calendar-year-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.safety-calendar-year-input {
+    width: 82px;
+    padding: 7px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--nav);
+    background: #fff;
+    font-size: 13px;
+}
+
 .inspection-calendar {
     min-width: 255px;
 }
