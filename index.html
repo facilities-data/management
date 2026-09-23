@@ -363,7 +363,21 @@
                             Monthly inspection register for fire extinguishers, emergency lights, FDAS, and AEDs.
                         </p>
                     </div>
-                    <div>
+                    <div class="safety-equipment-actions">
+                        <label class="safety-calendar-year-label" for="safety-calendar-year">
+                            Calendar Year
+                        </label>
+                        <input
+                            id="safety-calendar-year"
+                            class="safety-calendar-year-input"
+                            type="number"
+                            min="1"
+                            max="9999"
+                            step="1"
+                            value="2026"
+                            inputmode="numeric"
+                            aria-label="Safety equipment calendar year"
+                        >
                         <button type="button" class="btn-action btn-primary" id="add-safety-equipment">
                             + Add Equipment
                         </button>
@@ -867,5 +881,37 @@ document.addEventListener("DOMContentLoaded", () => {
 <script src="special-request.js"></script>
 
 <script src="script.js"></script>
+<script>
+    (() => {
+        const yearInput = document.getElementById("safety-calendar-year");
+
+        if (!yearInput) {
+            return;
+        }
+
+        const currentYear = new Date().getFullYear();
+        yearInput.value = currentYear;
+
+        const renderSafetyCalendarForYear = () => {
+            const year = Number(yearInput.value);
+
+            if (!Number.isInteger(year) || year < 1 || year > 9999) {
+                return;
+            }
+
+            if (typeof renderSafetyEquipment === "function") {
+                renderSafetyEquipment();
+            }
+        };
+
+        yearInput.addEventListener("change", renderSafetyCalendarForYear);
+        yearInput.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                renderSafetyCalendarForYear();
+            }
+        });
+    })();
+</script>
 </body>
 </html>
