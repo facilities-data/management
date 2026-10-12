@@ -295,7 +295,7 @@ function createProjectId() {
 
 function createAssetTag() {
     // Asset tags use six digits and begin at ARCPH50001.
-    return createId("ARCPH", cache.assets, 6, 50000);
+    return createId("ARCPH", cache.assets, 5, 50000);
 }
 
 function createVendorId() {
