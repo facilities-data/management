@@ -50,15 +50,13 @@
             search.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
-        if (scanTarget === "safety" && typeof renderSafetyEquipment === "function") {
-            renderSafetyEquipment();
-        } else if (typeof renderAssets === "function") {
-            renderAssets();
-        }
-
         setStatus(`Barcode detected: ${value}`, true);
         stopScanner();
-        setTimeout(() => modal?.classList.remove("open"), 900);
+        modal?.classList.remove("open");
+
+        if (typeof window.openBarcodeRecord === "function") {
+            window.openBarcodeRecord(scanTarget, value);
+        }
     }
 
     async function scanFrame() {
