@@ -54,9 +54,30 @@
         stopScanner();
         modal?.classList.remove("open");
 
-        if (typeof window.openBarcodeRecord === "function") {
-            window.openBarcodeRecord(scanTarget, value);
-        }
+        // Open the record editor after the scanner has been removed from the
+        // screen so the two dialogs cannot compete for visibility or focus.
+        window.setTimeout(() => {
+            const recordModalId = scanTarget === "safety"
+                ? "safety-equipment-modal"
+                : "asset-modal";
+            const recordModal = document.getElementById(recordModalId);
+
+            try {
+                if (typeof window.openBarcodeRecord === "function") {
+                    window.openBarcodeRecord(scanTarget, value);
+                } else {
+                    const tag = document.getElementById(
+                        scanTarget === "safety" ? "safety-equipment-tag" : "asset-tag"
+                    );
+                    if (tag) tag.value = value;
+                }
+            } catch (openError) {
+                console.error("Unable to open the barcode record:", openError);
+            } finally {
+                // Ensure a record form appears even if its app callback fails.
+                recordModal?.classList.add("open");
+            }
+        }, 0);
     }
 
     async function scanFrame() {
