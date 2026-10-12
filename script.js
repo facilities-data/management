@@ -1028,6 +1028,42 @@ function editAsset(id = "") {
     openModal("asset-modal");
 }
 
+function openBarcodeRecord(target, code) {
+    const value = String(code || "").trim();
+    const isSafety = target === "safety";
+    const records = isSafety ? cache.safety : cache.assets;
+    const record = records.find(item =>
+        String(item.id || "").trim().toLowerCase() === value.toLowerCase()
+    );
+    const search = getElement(
+        isSafety ? "safety-equipment-search" : "asset-search"
+    );
+
+    if (search) {
+        search.value = value;
+    }
+
+    if (isSafety) {
+        renderSafetyEquipment();
+        editSafetyEquipment(record?.id || "");
+        if (!record) {
+            getElement("safety-equipment-tag").value = value;
+        }
+    } else {
+        renderAssets();
+        editAsset(record?.id || "");
+        if (!record) {
+            getElement("asset-tag").value = value;
+        }
+    }
+
+    if (!record) {
+        showNotification(`Barcode “${value}” is not registered. Complete the form to add it.`);
+    }
+}
+
+window.openBarcodeRecord = openBarcodeRecord;
+
 async function saveAsset(event) {
     event.preventDefault();
 
