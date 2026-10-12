@@ -294,8 +294,8 @@ function createProjectId() {
 }
 
 function createAssetTag() {
-    // Asset tags use six digits and begin at ARCPH500001.
-    return createId("ARCPH", cache.assets, 6, 500000);
+    // Asset tags use six digits and begin at ARCPH50001.
+    return createId("ARCPH", cache.assets, 6, 50000);
 }
 
 function createVendorId() {
