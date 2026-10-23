@@ -1746,8 +1746,6 @@ function setupCalendarPanning() {
         startScrollLeft = calendar.scrollLeft;
         isDragging = true;
         movedDuringDrag = false;
-        calendar.classList.add("is-panning");
-        calendar.setPointerCapture?.(event.pointerId);
     });
 
     calendar.addEventListener("pointermove", event => {
@@ -1757,8 +1755,10 @@ function setupCalendarPanning() {
 
         const distance = event.clientX - startX;
 
-        if (Math.abs(distance) > 5) {
+        if (Math.abs(distance) > 5 && !movedDuringDrag) {
             movedDuringDrag = true;
+            calendar.classList.add("is-panning");
+            calendar.setPointerCapture?.(event.pointerId);
         }
 
         if (movedDuringDrag) {
