@@ -926,14 +926,25 @@ button:disabled {
     box-shadow: inset 0 0 0 1px var(--blue);
 }
 
+.inspection-month.inspected {
+    border-color: #0f5f58;
+    color: #fff;
+    background: #1bbeb1;
+}
+
 .inspection-month.inspected small {
-    color: #047857;
+    color: #ccfbf1;
     font-weight: 700;
 }
 
 .inspection-month:hover:not(:disabled) {
-    color: #134e4a;
+    color: #197a74;
     background: #99f6e4;
+}
+
+.inspection-month.inspected:hover:not(:disabled) {
+    color: #fff;
+    background: #058b83;
 }
 
 .date-input-note {
