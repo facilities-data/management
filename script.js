@@ -31,6 +31,9 @@ let barcodeScanFrame = null;
 let barcodeScanTarget = "assets";
 let dataInitializationPromise = null;
 let dataRenderPromise = null;
+const tableLoadSequence = Object.fromEntries(
+    Object.keys(TABLES).map(key => [key, 0])
+);
 let authStateListenerRegistered = false;
 let eventHandlersRegistered = false;
 let appInitialized = false;
@@ -173,6 +176,7 @@ async function requireLogin() {
 }
 
 async function loadTable(key) {
+    const requestNumber = ++tableLoadSequence[key];
     const { data, error } = await supabaseClient
         .from(TABLES[key])
         .select("*")
@@ -180,12 +184,20 @@ async function loadTable(key) {
 
     if (error) {
         console.error(`Unable to load ${key}:`, error);
+        if (key === "safety") {
+            showNotification("Unable to refresh safety equipment. Showing the last loaded records.");
+            return cache[key];
+        }
         alert(`Unable to load ${key}. Check your Supabase table and policies.`);
         cache[key] = [];
         return [];
     }
 
-    cache[key] = data || [];
+    // Ignore an older request that finished after a newer refresh.
+    if (requestNumber === tableLoadSequence[key]) {
+        cache[key] = data || [];
+    }
+
     return cache[key];
 }
 
@@ -220,7 +232,8 @@ async function saveRecord(
         result = await supabaseClient
             .from(TABLES[key])
             .update(recordToSave)
-            .eq("id", originalId);
+            .eq("id", originalId)
+            .select("id");
     } else {
         result = await supabaseClient
             .from(TABLES[key])
@@ -231,6 +244,15 @@ async function saveRecord(
         console.error(result.error);
         if (showError) {
             alert(result.error.message);
+        }
+        return false;
+    }
+
+    if (originalId && !result.data?.length) {
+        const message = `No ${key} record was updated. Check that the record exists and your Supabase update policy allows this account to edit it.`;
+        console.warn(message, originalId);
+        if (showError) {
+            alert(message);
         }
         return false;
     }
@@ -503,7 +525,11 @@ function setupNavigation() {
                 }
 
                 if (item.dataset.target === "safety-equipment-view") {
-                    showSafetyExpirationReminder();
+                    loadTable("safety").then(() => {
+                        renderSafetyEquipment();
+                        updateNavigationNotifications();
+                        showSafetyExpirationReminder();
+                    });
                 }
             };
         });
@@ -1269,7 +1295,7 @@ function getUpcomingSafetyExpirations() {
     return cache.safety
         .map(item => {
             const date = String(item.expiration_date || "").slice(0, 10);
-            if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 return null;
             }
 
@@ -1557,6 +1583,11 @@ async function saveSafetyEquipment(event) {
         if (historyError && !historyError.message?.includes("inspection_history")) {
             console.warn("Unable to save inspection history:", historyError);
         }
+
+        // Re-fetch the committed row so the tracker reflects the database state.
+        await loadTable("safety");
+        renderSafetyEquipment();
+        updateNavigationNotifications();
     }
 }
 
@@ -1826,7 +1857,8 @@ function setupCalendarPanning() {
     let movedDuringDrag = false;
 
     calendar.addEventListener("pointerdown", event => {
-        if (event.pointerType === "mouse" && event.button !== 0) {
+        if ((event.pointerType === "mouse" && event.button !== 0) ||
+            event.target.closest("button, a, input, select, textarea")) {
             return;
         }
 
@@ -1835,7 +1867,6 @@ function setupCalendarPanning() {
         isDragging = true;
         movedDuringDrag = false;
         calendar.classList.add("is-panning");
-        calendar.setPointerCapture?.(event.pointerId);
     });
 
     calendar.addEventListener("pointermove", event => {
