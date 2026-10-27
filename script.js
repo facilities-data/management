@@ -1845,8 +1845,9 @@ function setupCalendarPanning() {
 
         const distance = event.clientX - startX;
 
-        if (Math.abs(distance) > 5) {
+        if (Math.abs(distance) > 5 && !movedDuringDrag) {
             movedDuringDrag = true;
+            calendar.setPointerCapture?.(event.pointerId);
         }
 
         if (movedDuringDrag) {
