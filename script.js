@@ -1934,7 +1934,8 @@ function setupCalendarPanning() {
     let movedDuringDrag = false;
 
     calendar.addEventListener("pointerdown", event => {
-        if ((event.pointerType === "mouse" && event.button !== 0) ||
+        // Let mobile browsers handle touch swipes with native overflow scrolling.
+        if (event.pointerType !== "mouse" || event.button !== 0 ||
             event.target.closest("button, a, input, select, textarea")) {
             return;
         }
