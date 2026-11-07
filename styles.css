@@ -263,7 +263,9 @@ option {
 
 .table-wrap {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
+
 
 .safety-table-wrap {
     cursor: grab;
@@ -516,8 +518,9 @@ button:disabled {
     gap: 6px;
     padding-bottom: 6px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     cursor: grab;
-    touch-action: pan-y;
+    touch-action: pan-x pan-y;
     user-select: none;
 }
 
